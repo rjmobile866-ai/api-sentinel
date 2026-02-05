@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Api {
   id: string;
@@ -20,13 +21,6 @@ interface Api {
   force_proxy: boolean;
   rotation_enabled: boolean;
 }
-
-// Default CORS proxies
-const DEFAULT_PROXIES = [
-  { url: 'https://api.allorigins.win/raw?url=', name: 'AllOrigins', is_active: true },
-  { url: 'https://corsproxy.io/?', name: 'CORSProxy.io', is_active: true },
-  { url: 'https://api.codetabs.com/v1/proxy?quest=', name: 'CodeTabs', is_active: true },
-];
 
 interface QuickHitEngineProps {
   onLogCreate: (log: {
@@ -78,44 +72,35 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     },
   ];
 
-  const tryFetchWithProxy = async (
-    originalUrl: string,
-    options: RequestInit,
-    startIndex: number = 0
-  ): Promise<{ response: Response | null; proxyUsed: string | null; error?: string }> => {
-    for (let i = 0; i < DEFAULT_PROXIES.length; i++) {
-      const proxyIndex = (startIndex + i) % DEFAULT_PROXIES.length;
-      const proxy = DEFAULT_PROXIES[proxyIndex];
-      const proxyUrl = proxy.url + encodeURIComponent(originalUrl);
-      
-      try {
-        console.log(`[QUICK HIT] Trying proxy: ${proxy.name}`);
-        const response = await fetch(proxyUrl, {
-          ...options,
-          mode: 'cors',
-        });
-        return { response, proxyUsed: proxy.name };
-      } catch (error) {
-        console.warn(`[QUICK HIT] Proxy ${proxy.name} failed`);
-        continue;
-      }
-    }
-    return { response: null, proxyUsed: null, error: 'All proxies failed' };
+  const replacePlaceholders = (text: string, phoneNumber: string): string => {
+    return text.replace(/\{PHONE\}/gi, phoneNumber);
   };
 
-  const hitApi = async (api: Api, phoneNumber: string, proxyIndex: number = 0): Promise<number> => {
+  const replacePlaceholdersInObject = (obj: Record<string, unknown>, phoneNumber: string): Record<string, unknown> => {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        result[key] = replacePlaceholders(value, phoneNumber);
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = replacePlaceholdersInObject(value as Record<string, unknown>, phoneNumber);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  };
+
+  const hitApiViaEdgeFunction = async (api: Api, phoneNumber: string): Promise<void> => {
     const startTime = Date.now();
-    const isHttp = api.url.toLowerCase().startsWith('http://');
-    const shouldUseProxy = api.proxy_enabled || (isHttp && api.force_proxy);
-    
-    let finalUrl = api.url.replace(/\{PHONE\}/gi, phoneNumber);
+    let finalUrl = replacePlaceholders(api.url, phoneNumber);
     
     // Add query params
     try {
+      const queryParams = api.query_params || {};
       const urlObj = new URL(finalUrl);
-      Object.entries(api.query_params || {}).forEach(([key, value]) => {
+      Object.entries(queryParams).forEach(([key, value]) => {
         if (typeof value === 'string') {
-          urlObj.searchParams.set(key, value.replace(/\{PHONE\}/gi, phoneNumber));
+          urlObj.searchParams.set(key, replacePlaceholders(value, phoneNumber));
         }
       });
       finalUrl = urlObj.toString();
@@ -124,88 +109,72 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     }
 
     const headers: Record<string, string> = { ...api.headers };
-    let body: string | undefined;
+    let body: Record<string, unknown> | undefined;
     
-    if (['POST', 'PUT', 'PATCH'].includes(api.method)) {
-      const bodyObj = Object.fromEntries(
-        Object.entries(api.body || {}).map(([k, v]) => [
-          k,
-          typeof v === 'string' ? v.replace(/\{PHONE\}/gi, phoneNumber) : v
-        ])
-      );
-      body = JSON.stringify(bodyObj);
-      if (!headers['Content-Type']) {
-        headers['Content-Type'] = 'application/json';
-      }
+    if (['POST', 'PUT', 'PATCH'].includes(api.method.toUpperCase())) {
+      body = replacePlaceholdersInObject(api.body || {}, phoneNumber);
     }
 
-    const fetchOptions: RequestInit = { method: api.method, headers, body };
-    let mode = 'DIRECT';
-    let response: Response | null = null;
-    let errorMessage: string | undefined;
+    console.log(`[QUICK HIT] 🎯 Hitting via Edge Function: ${api.name}`);
 
-    console.log(`[QUICK HIT] 🎯 Hitting: ${api.name} | ${finalUrl}`);
-
-    if (shouldUseProxy) {
-      const result = await tryFetchWithProxy(finalUrl, fetchOptions, proxyIndex);
-      if (result.response) {
-        response = result.response;
-        mode = `PROXY (${result.proxyUsed})`;
-      } else {
-        errorMessage = result.error;
-      }
-    } else {
-      try {
-        response = await fetch(finalUrl, { ...fetchOptions, mode: 'cors' });
-      } catch (error) {
-        if (isHttp) {
-          console.log('[QUICK HIT] Falling back to proxy for HTTP...');
-          const result = await tryFetchWithProxy(finalUrl, fetchOptions, proxyIndex);
-          if (result.response) {
-            response = result.response;
-            mode = `PROXY FALLBACK (${result.proxyUsed})`;
-          } else {
-            errorMessage = error instanceof Error ? error.message : 'Network error';
-          }
-        } else {
-          errorMessage = error instanceof Error ? error.message : 'Network error';
-        }
-      }
-    }
-
-    const responseTime = Date.now() - startTime;
-    setHitCount(prev => prev + 1);
-
-    if (response) {
-      console.log(`[QUICK HIT] ✅ ${response.status} in ${responseTime}ms`);
-      if (response.ok) {
-        setSuccessCount(prev => prev + 1);
-      } else {
-        setFailCount(prev => prev + 1);
-      }
-      
-      onLogCreate({
-        api_name: api.name,
-        mode,
-        status_code: response.status,
-        success: response.ok,
-        response_time: responseTime,
+    try {
+      const { data, error } = await supabase.functions.invoke('hit-api', {
+        body: {
+          url: finalUrl,
+          method: api.method,
+          headers,
+          body,
+        },
       });
-    } else {
-      console.log(`[QUICK HIT] ❌ ${errorMessage}`);
+
+      const responseTime = Date.now() - startTime;
+      setHitCount(prev => prev + 1);
+
+      if (error) {
+        console.error('[QUICK HIT] ❌ Edge Function error:', error);
+        setFailCount(prev => prev + 1);
+        onLogCreate({
+          api_name: api.name,
+          mode: 'SERVER-SIDE',
+          status_code: null,
+          success: false,
+          response_time: responseTime,
+          error_message: error.message || 'Edge function error',
+        });
+        return;
+      }
+
+      if (data) {
+        console.log(`[QUICK HIT] ✅ ${data.status_code} in ${data.response_time || responseTime}ms`);
+        if (data.success) {
+          setSuccessCount(prev => prev + 1);
+        } else {
+          setFailCount(prev => prev + 1);
+        }
+
+        onLogCreate({
+          api_name: api.name,
+          mode: 'SERVER-SIDE',
+          status_code: data.status_code,
+          success: data.success,
+          response_time: data.response_time || responseTime,
+          error_message: data.error_message,
+        });
+      }
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      console.error('[QUICK HIT] ❌ Failed:', error);
       setFailCount(prev => prev + 1);
-      
+
       onLogCreate({
         api_name: api.name,
-        mode,
+        mode: 'SERVER-SIDE',
         status_code: null,
         success: false,
         response_time: responseTime,
-        error_message: errorMessage,
+        error_message: error instanceof Error ? error.message : 'Network error',
       });
     }
-
-    return responseTime;
   };
 
   const handleQuickHit = async () => {
@@ -221,12 +190,11 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
     console.log(`[QUICK HIT] Starting quick hit with ${sampleApis.length} APIs`);
 
-    let proxyIndex = 0;
     for (const api of sampleApis) {
       if (!isRunning) break;
       setCurrentApi(api.name);
-      proxyIndex = await hitApi(api, phone, proxyIndex);
-      
+      await hitApiViaEdgeFunction(api, phone);
+
       if (delay > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -301,7 +269,11 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         )}
 
         <div className="flex items-center justify-between p-3 bg-muted/10 rounded-lg border border-muted/30">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="text-center min-w-[60px]">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Server className="w-3 h-3" />Mode</p>
+              <p className="text-sm font-bold text-secondary">SERVER</p>
+            </div>
             {(isRunning || hitCount > 0) && (
               <>
                 <div className="text-center">
