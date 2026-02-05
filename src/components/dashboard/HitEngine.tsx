@@ -92,7 +92,12 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
   const hitApi = async (api: Api, phoneNumber: string): Promise<void> => {
     const startTime = Date.now();
     const isHttp = api.url.toLowerCase().startsWith('http://');
-    const shouldUseProxy = api.proxy_enabled || (isHttp && api.force_proxy);
+    
+    // Proxy logic:
+    // 1. If force_proxy is ON → always use proxy (even for HTTPS)
+    // 2. If proxy_enabled is ON → use proxy
+    // 3. If URL is HTTP → automatically use proxy (browsers block mixed content)
+    const shouldUseProxy = api.force_proxy || api.proxy_enabled || isHttp;
     
     let finalUrl = replacePlaceholders(api.url, phoneNumber);
     
