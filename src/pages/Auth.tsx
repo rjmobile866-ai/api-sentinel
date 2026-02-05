@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Terminal, AlertTriangle } from 'lucide-react';
+import { Shield, Terminal, AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Auth = () => {
@@ -30,16 +30,34 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email.trim() || !password.trim()) {
+      toast.error('Email aur password dono required hain');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password kam se kam 6 characters ka hona chahiye');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const { error } = isLogin
-      ? await signIn(email, password)
-      : await signUp(email, password);
+    try {
+      const { error } = isLogin
+        ? await signIn(email, password)
+        : await signUp(email, password);
 
-    if (error) {
-      toast.error(error.message);
-    } else if (!isLogin) {
-      toast.success('Account created! Check your email to verify.');
+      if (error) {
+        toast.error(error.message);
+      } else if (!isLogin) {
+        toast.success('Account created! Ab login kar sakte ho.');
+        setIsLogin(true);
+      } else {
+        toast.success('Login successful!');
+      }
+    } catch (err) {
+      toast.error('Something went wrong');
     }
 
     setIsSubmitting(false);
@@ -81,6 +99,7 @@ const Auth = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="operator@domain.com"
                 required
+                disabled={isSubmitting}
                 className="bg-input border-primary/30 focus:border-primary focus:glow-primary text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -93,6 +112,7 @@ const Auth = () => {
                 placeholder="••••••••"
                 required
                 minLength={6}
+                disabled={isSubmitting}
                 className="bg-input border-primary/30 focus:border-primary focus:glow-primary text-foreground"
               />
             </div>
@@ -101,12 +121,22 @@ const Auth = () => {
               disabled={isSubmitting}
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary font-bold"
             >
-              {isSubmitting ? 'PROCESSING...' : isLogin ? 'ACCESS SYSTEM' : 'CREATE ACCOUNT'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  PROCESSING...
+                </>
+              ) : isLogin ? (
+                'ACCESS SYSTEM'
+              ) : (
+                'CREATE ACCOUNT'
+              )}
             </Button>
           </form>
           <div className="mt-4 text-center">
             <button
               onClick={() => setIsLogin(!isLogin)}
+              disabled={isSubmitting}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               {isLogin ? "Don't have an account? Register" : 'Already have an account? Login'}
@@ -116,7 +146,7 @@ const Auth = () => {
       </Card>
 
       <p className="mt-6 text-xs text-muted-foreground text-center">
-        Secure connection established • All data encrypted
+        🔒 Secure connection established • Password-based access
       </p>
     </div>
   );
