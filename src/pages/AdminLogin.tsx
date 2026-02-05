@@ -30,18 +30,17 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background scanline p-4">
-      <div className="absolute inset-0 gradient-matrix pointer-events-none" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 relative">
       
       {/* Warning Banner */}
-      <div className="w-full max-w-md mb-6 p-3 border border-warning/50 bg-warning/10 rounded-lg flex items-center gap-3">
+      <div className="w-full max-w-md mb-6 p-3 border border-warning/50 bg-warning/10 rounded-lg flex items-center gap-3 relative z-10">
         <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
         <p className="text-sm text-warning">
           ⚠️ Yeh tool sirf authorized testing ke liye hai.
         </p>
       </div>
 
-      <Card className="w-full max-w-md border-primary/30 bg-card/80 backdrop-blur glow-primary">
+      <Card className="w-full max-w-md border-primary/30 bg-card/80 backdrop-blur glow-primary relative z-10">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="p-4 rounded-full bg-primary/10 border border-primary/30 glow-primary">
@@ -88,7 +87,7 @@ const AdminLogin = () => {
         </CardContent>
       </Card>
 
-      <p className="mt-6 text-xs text-muted-foreground text-center">
+      <p className="mt-6 text-xs text-muted-foreground text-center relative z-10">
         🔐 Secure access required
       </p>
     </div>

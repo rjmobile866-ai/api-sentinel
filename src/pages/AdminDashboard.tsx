@@ -69,7 +69,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background scanline">
+    <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-matrix pointer-events-none" />
       
       {/* Custom Header */}
@@ -93,7 +93,7 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6 relative">
+      <main className="container mx-auto px-4 py-6 space-y-6">{/* removed relative */}
         <DisclaimerBanner />
 
         {/* Hit Engine */}
