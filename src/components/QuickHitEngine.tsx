@@ -41,6 +41,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
   const [currentApi, setCurrentApi] = useState<string | null>(null);
+  const stopRef = React.useRef(false);
 
   // Sample APIs for quick testing
   const sampleApis: Api[] = [
@@ -115,7 +116,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       body = replacePlaceholdersInObject(api.body || {}, phoneNumber);
     }
 
-    console.log(`[QUICK HIT] 🎯 Hitting via Edge Function: ${api.name}`);
+    console.log(`[QUICK HIT] 🎯 Hitting via Edge Function: ${api.name} -> ${finalUrl}`);
 
     try {
       const { data, error } = await supabase.functions.invoke('hit-api', {
@@ -145,7 +146,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       }
 
       if (data) {
-        console.log(`[QUICK HIT] ✅ ${data.status_code} in ${data.response_time || responseTime}ms`);
+        console.log(`[QUICK HIT] ✅ ${api.name}: ${data.status_code} in ${data.response_time || responseTime}ms`);
         if (data.success) {
           setSuccessCount(prev => prev + 1);
         } else {
@@ -183,31 +184,37 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       return;
     }
 
+    stopRef.current = false;
     setIsRunning(true);
     setHitCount(0);
     setSuccessCount(0);
     setFailCount(0);
 
-    console.log(`[QUICK HIT] Starting quick hit with ${sampleApis.length} APIs`);
+    console.log(`[QUICK HIT] Starting quick hit with ${sampleApis.length} APIs via Edge Function`);
+    toast.info('Starting server-side API hits...');
 
     for (const api of sampleApis) {
-      if (!isRunning) break;
+      if (stopRef.current) break;
       setCurrentApi(api.name);
       await hitApiViaEdgeFunction(api, phone);
 
-      if (delay > 0) {
+      if (delay > 0 && !stopRef.current) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     setCurrentApi(null);
     setIsRunning(false);
-    toast.success('Quick hit completed!');
+    if (!stopRef.current) {
+      toast.success('Quick hit completed!');
+    }
   };
 
   const handleStop = () => {
+    stopRef.current = true;
     setIsRunning(false);
     setCurrentApi(null);
+    toast.info('Stopped');
   };
 
   return (
