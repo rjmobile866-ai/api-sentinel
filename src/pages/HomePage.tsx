@@ -27,7 +27,7 @@ const HomePage = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6 relative">
+      <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Warning Banner */}
         <div className="w-full p-3 border border-warning/50 bg-warning/10 rounded-lg flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
