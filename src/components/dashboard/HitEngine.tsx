@@ -1,10 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, Zap, Phone, Clock, RotateCcw, Wifi, Activity } from 'lucide-react';
+import { Play, Square, Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Api {
   id: string;
@@ -33,13 +34,6 @@ interface HitEngineProps {
   }) => void;
 }
 
-// Default CORS proxies with fallback support
-const DEFAULT_PROXIES = [
-  { url: 'https://api.allorigins.win/raw?url=', name: 'AllOrigins', is_active: true },
-  { url: 'https://corsproxy.io/?', name: 'CORSProxy.io', is_active: true },
-  { url: 'https://api.codetabs.com/v1/proxy?quest=', name: 'CodeTabs', is_active: true },
-];
-
 const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => {
   const [phone, setPhone] = useState('');
   const [delay, setDelay] = useState(500);
@@ -51,56 +45,31 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
   const abortRef = useRef(false);
-  const proxyIndexRef = useRef(0);
-
-  const getActiveProxies = useCallback(() => {
-    const userProxies = proxies.filter(p => p.is_active);
-    return userProxies.length > 0 ? userProxies : DEFAULT_PROXIES;
-  }, [proxies]);
 
   const replacePlaceholders = (text: string, phoneNumber: string): string => {
     return text.replace(/\{PHONE\}/gi, phoneNumber);
   };
 
-  const tryFetchWithProxy = async (
-    originalUrl: string,
-    options: RequestInit,
-    activeProxies: Array<{ url: string; name?: string }>,
-    startIndex: number
-  ): Promise<{ response: Response | null; proxyUsed: string | null; error?: string }> => {
-    for (let i = 0; i < activeProxies.length; i++) {
-      const proxyIndex = (startIndex + i) % activeProxies.length;
-      const proxy = activeProxies[proxyIndex];
-      const proxyUrl = proxy.url + encodeURIComponent(originalUrl);
-      
-      try {
-        console.log(`[HIT ENGINE] Trying proxy: ${proxy.name || proxy.url}`);
-        const response = await fetch(proxyUrl, {
-          ...options,
-          mode: 'cors',
-        });
-        proxyIndexRef.current = proxyIndex + 1;
-        return { response, proxyUsed: proxy.name || 'Proxy' };
-      } catch (error) {
-        console.warn(`[HIT ENGINE] Proxy ${proxy.name || proxy.url} failed:`, error);
-        continue;
+  const replacePlaceholdersInObject = (obj: Record<string, unknown>, phoneNumber: string): Record<string, unknown> => {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        result[key] = replacePlaceholders(value, phoneNumber);
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = replacePlaceholdersInObject(value as Record<string, unknown>, phoneNumber);
+      } else {
+        result[key] = value;
       }
     }
-    return { response: null, proxyUsed: null, error: 'All proxies failed' };
+    return result;
   };
 
-  const hitApi = async (api: Api, phoneNumber: string): Promise<void> => {
+  const hitApiViaEdgeFunction = async (api: Api, phoneNumber: string): Promise<void> => {
     const startTime = Date.now();
-    const isHttp = api.url.toLowerCase().startsWith('http://');
-    
-    // Proxy logic:
-    // 1. If force_proxy is ON → always use proxy (even for HTTPS)
-    // 2. If proxy_enabled is ON → use proxy
-    // 3. If URL is HTTP → automatically use proxy (browsers block mixed content)
-    const shouldUseProxy = api.force_proxy || api.proxy_enabled || isHttp;
-    
+
+    // Prepare final URL with placeholder replacement
     let finalUrl = replacePlaceholders(api.url, phoneNumber);
-    
+
     // Add query params
     try {
       const queryParams = api.query_params || {};
@@ -115,7 +84,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
       console.error('[HIT ENGINE] Invalid URL:', e);
     }
 
-    // Prepare headers
+    // Prepare headers with placeholder replacement
     const headers: Record<string, string> = {};
     const apiHeaders = api.headers || {};
     Object.entries(apiHeaders).forEach(([key, value]) => {
@@ -124,116 +93,74 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
       }
     });
 
-    // Prepare body
-    const bodyData = api.body || {};
-    let body: string | undefined;
-    if (['POST', 'PUT', 'PATCH'].includes(api.method)) {
-      body = JSON.stringify(
-        Object.fromEntries(
-          Object.entries(bodyData).map(([k, v]) => [
-            k,
-            typeof v === 'string' ? replacePlaceholders(v, phoneNumber) : v
-          ])
-        )
-      );
-      if (!headers['Content-Type']) {
-        headers['Content-Type'] = 'application/json';
-      }
+    // Prepare body with placeholder replacement
+    let body: Record<string, unknown> | undefined;
+    if (['POST', 'PUT', 'PATCH'].includes(api.method.toUpperCase()) && api.body) {
+      body = replacePlaceholdersInObject(api.body, phoneNumber);
     }
 
-    const fetchOptions: RequestInit = {
-      method: api.method,
-      headers,
-      body,
-    };
-
-    let mode = 'DIRECT';
-    let response: Response | null = null;
-    let errorMessage: string | undefined;
-
-    console.log(`[HIT ENGINE] 🎯 Hitting API: ${api.name}`);
+    console.log(`[HIT ENGINE] 🎯 Hitting API via Edge Function: ${api.name}`);
     console.log(`[HIT ENGINE] URL: ${finalUrl}`);
     console.log(`[HIT ENGINE] Method: ${api.method}`);
-    console.log(`[HIT ENGINE] Use Proxy: ${shouldUseProxy}`);
 
-    if (shouldUseProxy) {
-      // Use proxy with fallback
-      const activeProxies = getActiveProxies();
-      const result = await tryFetchWithProxy(
-        finalUrl,
-        fetchOptions,
-        activeProxies,
-        proxyIndexRef.current
-      );
-      
-      if (result.response) {
-        response = result.response;
-        mode = `PROXY (${result.proxyUsed})`;
-      } else {
-        errorMessage = result.error;
-      }
-    } else {
-      // Direct fetch
-      try {
-        response = await fetch(finalUrl, {
-          ...fetchOptions,
-          mode: 'cors',
-        });
-      } catch (error) {
-        console.error('[HIT ENGINE] Direct fetch failed:', error);
-        
-        // If direct fails and it's HTTP, try proxy as fallback
-        if (isHttp) {
-          console.log('[HIT ENGINE] Falling back to proxy for HTTP URL...');
-          const activeProxies = getActiveProxies();
-          const result = await tryFetchWithProxy(
-            finalUrl,
-            fetchOptions,
-            activeProxies,
-            proxyIndexRef.current
-          );
-          
-          if (result.response) {
-            response = result.response;
-            mode = `PROXY FALLBACK (${result.proxyUsed})`;
-          } else {
-            errorMessage = error instanceof Error ? error.message : 'Network error';
-          }
-        } else {
-          errorMessage = error instanceof Error ? error.message : 'Network error';
-        }
-      }
-    }
-
-    const responseTime = Date.now() - startTime;
-    setHitCount(prev => prev + 1);
-
-    if (response) {
-      console.log(`[HIT ENGINE] ✅ Response: ${response.status} in ${responseTime}ms`);
-      if (response.ok) {
-        setSuccessCount(prev => prev + 1);
-      } else {
-        setFailCount(prev => prev + 1);
-      }
-      
-      onLogCreate({
-        api_name: api.name,
-        mode,
-        status_code: response.status,
-        success: response.ok,
-        response_time: responseTime,
+    try {
+      // Call the Edge Function
+      const { data, error } = await supabase.functions.invoke('hit-api', {
+        body: {
+          url: finalUrl,
+          method: api.method,
+          headers,
+          body,
+        },
       });
-    } else {
-      console.log(`[HIT ENGINE] ❌ Failed: ${errorMessage}`);
+
+      const responseTime = Date.now() - startTime;
+      setHitCount(prev => prev + 1);
+
+      if (error) {
+        console.error('[HIT ENGINE] ❌ Edge Function error:', error);
+        setFailCount(prev => prev + 1);
+        onLogCreate({
+          api_name: api.name,
+          mode: 'SERVER-SIDE',
+          status_code: null,
+          success: false,
+          response_time: responseTime,
+          error_message: error.message || 'Edge function error',
+        });
+        return;
+      }
+
+      if (data) {
+        console.log(`[HIT ENGINE] ✅ Response: ${data.status_code} in ${data.response_time}ms`);
+        
+        if (data.success) {
+          setSuccessCount(prev => prev + 1);
+        } else {
+          setFailCount(prev => prev + 1);
+        }
+
+        onLogCreate({
+          api_name: api.name,
+          mode: 'SERVER-SIDE',
+          status_code: data.status_code,
+          success: data.success,
+          response_time: data.response_time || responseTime,
+          error_message: data.error_message,
+        });
+      }
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      console.error('[HIT ENGINE] ❌ Failed:', error);
       setFailCount(prev => prev + 1);
-      
+
       onLogCreate({
         api_name: api.name,
-        mode,
+        mode: 'SERVER-SIDE',
         status_code: null,
         success: false,
         response_time: responseTime,
-        error_message: errorMessage,
+        error_message: error instanceof Error ? error.message : 'Network error',
       });
     }
   };
@@ -250,7 +177,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
     setHitCount(0);
     setSuccessCount(0);
     setFailCount(0);
-    proxyIndexRef.current = 0;
+    
 
     console.log('[HIT ENGINE] 🚀 Starting hit engine...');
     console.log(`[HIT ENGINE] APIs: ${enabledApis.length}, Rounds: ${maxRounds}, Delay: ${delay}ms`);
@@ -263,7 +190,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
       for (const api of enabledApis) {
         if (abortRef.current) break;
         setCurrentApi(api.name);
-        await hitApi(api, phone);
+        await hitApiViaEdgeFunction(api, phone);
         
         if (delay > 0 && !abortRef.current) {
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -284,7 +211,6 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
   };
 
   const enabledCount = apis.filter(a => a.enabled).length;
-  const activeProxiesCount = getActiveProxies().length;
 
   return (
     <Card className="border-primary/30 bg-card glow-primary">
@@ -368,8 +294,8 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
               <p className="text-lg font-bold text-primary">{enabledCount}</p>
             </div>
             <div className="text-center min-w-[60px]">
-              <p className="text-xs text-muted-foreground">Proxies</p>
-              <p className="text-lg font-bold text-secondary">{activeProxiesCount}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Server className="w-3 h-3" />Mode</p>
+              <p className="text-lg font-bold text-secondary">SERVER</p>
             </div>
             {(isRunning || hitCount > 0) && (
               <>
