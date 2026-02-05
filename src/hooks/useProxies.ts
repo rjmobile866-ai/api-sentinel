@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
 
 interface Proxy {
   id: string;
@@ -18,37 +16,12 @@ const DEFAULT_PROXIES: Proxy[] = [
 ];
 
 export const useProxies = () => {
-  const { user } = useAuth();
-  const [proxies, setProxies] = useState<Proxy[]>(DEFAULT_PROXIES);
-  const [loading, setLoading] = useState(true);
+  const [proxies] = useState<Proxy[]>(DEFAULT_PROXIES);
+  const [loading] = useState(false);
 
-  const fetchProxies = async () => {
-    if (!user) {
-      setProxies(DEFAULT_PROXIES);
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('cors_proxies')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('priority', { ascending: true });
-
-    if (error) {
-      console.error('Failed to fetch proxies:', error);
-      setProxies(DEFAULT_PROXIES);
-    } else if (data && data.length > 0) {
-      setProxies(data);
-    } else {
-      setProxies(DEFAULT_PROXIES);
-    }
-    setLoading(false);
+  const refetch = () => {
+    // No-op for now, using default proxies
   };
 
-  useEffect(() => {
-    fetchProxies();
-  }, [user]);
-
-  return { proxies, loading, refetch: fetchProxies };
+  return { proxies, loading, refetch };
 };
