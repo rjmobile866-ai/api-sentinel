@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -18,97 +17,58 @@ interface Api {
   rotation_enabled: boolean;
 }
 
+// Store APIs in localStorage for unauthenticated admin
+const STORAGE_KEY = 'admin_apis';
+
 export const useApis = () => {
-  const { user } = useAuth();
   const [apis, setApis] = useState<Api[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchApis = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('apis')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error('Failed to load APIs');
-      console.error(error);
-    } else {
-      setApis(data.map(api => ({
-        ...api,
-        headers: (api.headers as Record<string, string>) || {},
-        body: (api.body as Record<string, unknown>) || {},
-        query_params: (api.query_params as Record<string, string>) || {},
-      })));
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setApis(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Failed to load APIs from storage:', e);
     }
     setLoading(false);
   };
 
-  const addApi = async (apiData: Omit<Api, 'id'>) => {
-    if (!user) return;
-
-    const { error } = await supabase.from('apis').insert({
-      user_id: user.id,
-      name: apiData.name,
-      url: apiData.url,
-      method: apiData.method,
-      headers: apiData.headers as unknown as Json,
-      body: apiData.body as unknown as Json,
-      query_params: apiData.query_params as unknown as Json,
-      enabled: apiData.enabled,
-      proxy_enabled: apiData.proxy_enabled,
-      force_proxy: apiData.force_proxy,
-      rotation_enabled: apiData.rotation_enabled,
-    });
-
-    if (error) {
-      toast.error('Failed to add API');
-      console.error(error);
-    } else {
-      toast.success('API added successfully');
-      fetchApis();
+  const saveToStorage = (newApis: Api[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newApis));
+    } catch (e) {
+      console.error('Failed to save APIs:', e);
     }
+  };
+
+  const addApi = async (apiData: Omit<Api, 'id'>) => {
+    const newApi: Api = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...apiData,
+    };
+    
+    const updated = [...apis, newApi];
+    setApis(updated);
+    saveToStorage(updated);
+    toast.success('API added');
   };
 
   const updateApi = async (id: string, updates: Partial<Api>) => {
-    const updateData: Record<string, unknown> = {};
-    
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.url !== undefined) updateData.url = updates.url;
-    if (updates.method !== undefined) updateData.method = updates.method;
-    if (updates.headers !== undefined) updateData.headers = updates.headers as unknown as Json;
-    if (updates.body !== undefined) updateData.body = updates.body as unknown as Json;
-    if (updates.query_params !== undefined) updateData.query_params = updates.query_params as unknown as Json;
-    if (updates.enabled !== undefined) updateData.enabled = updates.enabled;
-    if (updates.proxy_enabled !== undefined) updateData.proxy_enabled = updates.proxy_enabled;
-    if (updates.force_proxy !== undefined) updateData.force_proxy = updates.force_proxy;
-    if (updates.rotation_enabled !== undefined) updateData.rotation_enabled = updates.rotation_enabled;
-
-    const { error } = await supabase
-      .from('apis')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) {
-      toast.error('Failed to update API');
-      console.error(error);
-    } else {
-      fetchApis();
-    }
+    const updated = apis.map(api =>
+      api.id === id ? { ...api, ...updates } : api
+    );
+    setApis(updated);
+    saveToStorage(updated);
   };
 
   const deleteApi = async (id: string) => {
-    const { error } = await supabase.from('apis').delete().eq('id', id);
-
-    if (error) {
-      toast.error('Failed to delete API');
-      console.error(error);
-    } else {
-      toast.success('API deleted');
-      fetchApis();
-    }
+    const updated = apis.filter(api => api.id !== id);
+    setApis(updated);
+    saveToStorage(updated);
+    toast.success('API deleted');
   };
 
   const toggleApiField = async (id: string, field: string, value: boolean) => {
@@ -117,7 +77,7 @@ export const useApis = () => {
 
   useEffect(() => {
     fetchApis();
-  }, [user]);
+  }, []);
 
   return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, refetch: fetchApis };
 };
