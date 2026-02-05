@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -33,6 +33,8 @@ interface QuickHitEngineProps {
   }) => void;
 }
 
+const STORAGE_KEY = 'admin_apis';
+
 const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [phone, setPhone] = useState('');
   const [delay, setDelay] = useState(500);
@@ -41,37 +43,34 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
   const [currentApi, setCurrentApi] = useState<string | null>(null);
+  const [apis, setApis] = useState<Api[]>([]);
   const stopRef = React.useRef(false);
 
-  // Sample APIs for quick testing
-  const sampleApis: Api[] = [
-    {
-      id: '1',
-      name: 'HTTPBin GET',
-      url: 'https://httpbin.org/get',
-      method: 'GET',
-      headers: {},
-      body: {},
-      query_params: { phone: '{PHONE}' },
-      enabled: true,
-      proxy_enabled: false,
-      force_proxy: true,
-      rotation_enabled: false,
-    },
-    {
-      id: '2',
-      name: 'HTTPBin POST',
-      url: 'https://httpbin.org/post',
-      method: 'POST',
-      headers: {},
-      body: { phone: '{PHONE}', test: 'true' },
-      query_params: {},
-      enabled: true,
-      proxy_enabled: false,
-      force_proxy: true,
-      rotation_enabled: false,
-    },
-  ];
+  // Load APIs from localStorage (same as admin panel)
+  useEffect(() => {
+    const loadApis = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsedApis = JSON.parse(stored) as Api[];
+          setApis(parsedApis);
+        }
+      } catch (e) {
+        console.error('[QUICK HIT] Failed to load APIs:', e);
+      }
+    };
+    
+    loadApis();
+    
+    // Listen for storage changes (when admin adds new APIs)
+    const handleStorageChange = () => loadApis();
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Get only enabled APIs
+  const enabledApis = apis.filter(api => api.enabled);
 
   const replacePlaceholders = (text: string, phoneNumber: string): string => {
     return text.replace(/\{PHONE\}/gi, phoneNumber);
@@ -184,16 +183,21 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       return;
     }
 
+    if (enabledApis.length === 0) {
+      toast.error('Koi API enabled nahi hai! Pehle Admin Panel me APIs add karo.');
+      return;
+    }
+
     stopRef.current = false;
     setIsRunning(true);
     setHitCount(0);
     setSuccessCount(0);
     setFailCount(0);
 
-    console.log(`[QUICK HIT] Starting quick hit with ${sampleApis.length} APIs via Edge Function`);
-    toast.info('Starting server-side API hits...');
+    console.log(`[QUICK HIT] Starting quick hit with ${enabledApis.length} APIs via Edge Function`);
+    toast.info(`Hitting ${enabledApis.length} APIs via server...`);
 
-    for (const api of sampleApis) {
+    for (const api of enabledApis) {
       if (stopRef.current) break;
       setCurrentApi(api.name);
       await hitApiViaEdgeFunction(api, phone);
@@ -319,9 +323,18 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
-          Test 2 sample APIs with just a phone number • Full admin panel at /admin
-        </p>
+        {enabledApis.length === 0 ? (
+          <div className="p-3 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-warning" />
+            <p className="text-xs text-warning">
+              Koi API configured nahi hai. Pehle <a href="/admin" className="underline font-bold">Admin Panel</a> me APIs add karo.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center">
+            {enabledApis.length} API(s) ready • Same APIs as Admin Panel
+          </p>
+        )}
       </CardContent>
     </Card>
   );
