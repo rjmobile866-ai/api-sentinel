@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Square, Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, Shield } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 interface Api {
   id: string;
@@ -38,6 +39,7 @@ interface HitEngineProps {
 }
 
 const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => {
+  const { settings } = useSiteSettings();
   const [phone, setPhone] = useState('');
   const [delay, setDelay] = useState(500);
   const [maxRounds, setMaxRounds] = useState(1);
@@ -118,6 +120,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
           bodyType: api.bodyType || 'json',
           useProxy,
           useResidentialProxy: api.residential_proxy_enabled || false,
+          residentialProxyUrl: settings.residentialProxyUrl || '',
         },
       });
 

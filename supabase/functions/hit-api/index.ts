@@ -29,11 +29,7 @@ interface HitApiRequest {
   bodyType?: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none';
   useProxy?: boolean;
   useResidentialProxy?: boolean;
-}
-
-// Get residential proxy URL from environment (user configured)
-function getResidentialProxyUrl(): string | null {
-  return Deno.env.get('RESIDENTIAL_PROXY_URL') || null;
+  residentialProxyUrl?: string;
 }
 
 async function makeRequestViaResidentialProxy(
@@ -133,7 +129,8 @@ serve(async (req) => {
       body, 
       bodyType = 'json', 
       useProxy = false,
-      useResidentialProxy = false 
+      useResidentialProxy = false,
+      residentialProxyUrl = ''
     }: HitApiRequest = await req.json();
 
     if (!url || !method) {
@@ -177,8 +174,6 @@ serve(async (req) => {
 
     // Check if residential proxy is requested and configured
     if (useResidentialProxy) {
-      const residentialProxyUrl = getResidentialProxyUrl();
-      
       if (!residentialProxyUrl) {
         console.log('[hit-api] Residential proxy requested but not configured');
         return new Response(
