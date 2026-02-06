@@ -33,6 +33,7 @@ interface ApiImporterProps {
     method: string;
     headers: Record<string, string>;
     body: Record<string, unknown>;
+    bodyType?: BodyType;
     query_params: Record<string, string>;
     enabled: boolean;
     proxy_enabled: boolean;
@@ -703,6 +704,7 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
       method: parsedApi.method,
       headers: parsedApi.headers,
       body: bodyForStorage,
+      bodyType: parsedApi.bodyType,
       query_params: parsedApi.query_params,
       enabled,
       proxy_enabled: proxyEnabled,
