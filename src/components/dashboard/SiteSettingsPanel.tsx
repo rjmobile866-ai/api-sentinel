@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, RotateCcw, Save, Image, Type, AlertTriangle } from 'lucide-react';
+import { Settings, RotateCcw, Save, Image, Type, AlertTriangle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSiteSettings, SiteSettings } from '@/hooks/useSiteSettings';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-
 const SiteSettingsPanel: React.FC = () => {
   const { settings, updateSettings, resetSettings, DEFAULT_SETTINGS } = useSiteSettings();
   const [formData, setFormData] = useState<SiteSettings>(settings);
@@ -281,6 +280,31 @@ const SiteSettingsPanel: React.FC = () => {
                   onChange={(e) => handleChange('noApisText', e.target.value)}
                   className="bg-input border-secondary/30 text-sm"
                 />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Security / Password */}
+          <AccordionItem value="security" className="border border-destructive/30 rounded-lg px-3">
+            <AccordionTrigger className="py-2 text-sm">
+              <div className="flex items-center gap-2 text-destructive">
+                <Lock className="w-4 h-4" />
+                Security (Admin Password)
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Admin Panel Password</Label>
+                <Input
+                  type="password"
+                  value={formData.adminPassword}
+                  onChange={(e) => handleChange('adminPassword', e.target.value)}
+                  placeholder="Enter new password"
+                  className="bg-input border-destructive/30 text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  ⚠️ Yeh password admin login ke liye use hoga
+                </p>
               </div>
             </AccordionContent>
           </AccordionItem>

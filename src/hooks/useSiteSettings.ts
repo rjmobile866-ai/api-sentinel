@@ -27,6 +27,9 @@ export interface SiteSettings {
   
   // Logo
   logoUrl: string;
+  
+  // Security
+  adminPassword: string;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -47,6 +50,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   addApiButtonText: 'Add API',
   noApisText: 'No APIs added yet',
   logoUrl: '',
+  adminPassword: '12345',
 };
 
 const STORAGE_KEY = 'site_settings';

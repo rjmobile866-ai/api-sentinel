@@ -5,18 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Terminal, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { settings } = useSiteSettings();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simple password check (12345)
-    if (password === '12345') {
+    // Check against stored password from settings
+    const storedPassword = settings.adminPassword || '12345';
+    if (password === storedPassword) {
       // Store admin session in sessionStorage
       sessionStorage.setItem('adminAuth', 'true');
       toast.success('Access granted!');
