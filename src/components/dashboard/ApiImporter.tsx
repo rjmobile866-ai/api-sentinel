@@ -64,6 +64,7 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
   const [rawCode, setRawCode] = useState('');
   const [parsedApi, setParsedApi] = useState<ParsedApi | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [parseWarning, setParseWarning] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [apiName, setApiName] = useState('');
   const [enabled, setEnabled] = useState(true);
@@ -274,60 +275,107 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     };
   };
 
-  // Parse body from code
-  const parseBody = (code: string): Record<string, unknown> => {
+  // Parse body from code with variable resolution
+  const parseBody = (code: string): { body: Record<string, unknown>; parseWarning?: string } => {
     let body: Record<string, unknown> = {};
+    let parseWarning: string | undefined;
     
     // Pattern 1: body: JSON.stringify({...})
-    const jsonStringifyMatch = code.match(/body\s*:\s*JSON\.stringify\s*\(\s*(\{[\s\S]*?\})\s*\)/);
-    if (jsonStringifyMatch) {
+    const jsonStringifyInlineMatch = code.match(/body\s*:\s*JSON\.stringify\s*\(\s*(\{[\s\S]*?\})\s*\)/);
+    if (jsonStringifyInlineMatch) {
       try {
-        let bodyStr = jsonStringifyMatch[1];
+        let bodyStr = jsonStringifyInlineMatch[1];
         bodyStr = bodyStr.replace(/'/g, '"');
         bodyStr = bodyStr.replace(/,\s*}/g, '}');
         bodyStr = bodyStr.replace(/,\s*]/g, ']');
         bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-        // Handle unquoted keys
         bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
         body = JSON.parse(bodyStr);
-        return body;
+        return { body };
       } catch {
         // Continue to other patterns
       }
     }
     
-    // Pattern 2: body: data (where data is a variable containing object)
+    // Pattern 2: body: variable (variable resolution)
     const bodyVarMatch = code.match(/body\s*:\s*([a-zA-Z_]\w*)\s*[,}]/);
-    if (bodyVarMatch) {
+    if (bodyVarMatch && Object.keys(body).length === 0) {
       const varName = bodyVarMatch[1];
-      // Look for variable definition
-      const varDefMatch = code.match(new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*(\\{[\\s\\S]*?\\})\\s*[;\\n]`));
-      if (varDefMatch) {
+      
+      // Try to find JSON.stringify(object) definition
+      // Pattern: const varName = JSON.stringify({...})
+      const jsonStringifyVarMatch = code.match(
+        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*JSON\\.stringify\\s*\\(\\s*(\\{[\\s\\S]*?\\})\\s*\\)`)
+      );
+      
+      if (jsonStringifyVarMatch) {
         try {
-          let bodyStr = varDefMatch[1];
+          let bodyStr = jsonStringifyVarMatch[1];
           bodyStr = bodyStr.replace(/'/g, '"');
           bodyStr = bodyStr.replace(/,\s*}/g, '}');
+          bodyStr = bodyStr.replace(/,\s*]/g, ']');
           bodyStr = bodyStr.replace(/\n\s*/g, ' ');
           bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
           body = JSON.parse(bodyStr);
-          return body;
+          return { body };
         } catch {
           // Continue
         }
+      }
+      
+      // Pattern: const varName = {...} (direct object)
+      const objectVarMatch = code.match(
+        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*(\\{[\\s\\S]*?\\})\\s*[;\\n]`)
+      );
+      
+      if (objectVarMatch) {
+        try {
+          let bodyStr = objectVarMatch[1];
+          bodyStr = bodyStr.replace(/'/g, '"');
+          bodyStr = bodyStr.replace(/,\s*}/g, '}');
+          bodyStr = bodyStr.replace(/,\s*]/g, ']');
+          bodyStr = bodyStr.replace(/\n\s*/g, ' ');
+          bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+          body = JSON.parse(bodyStr);
+          return { body };
+        } catch {
+          // Continue
+        }
+      }
+      
+      // Pattern: const varName = "json string"
+      const stringVarMatch = code.match(
+        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*["'\`]([\s\\S]*?)["'\`]\\s*[;\\n]`)
+      );
+      
+      if (stringVarMatch) {
+        try {
+          body = JSON.parse(stringVarMatch[1]);
+          return { body };
+        } catch {
+          // Not valid JSON string
+        }
+      }
+      
+      // If variable definition not found but body uses a variable
+      if (Object.keys(body).length === 0) {
+        parseWarning = `Body variable "${varName}" found but definition not detected. Please check or manually enter body.`;
+        return { body, parseWarning };
       }
     }
     
     // Pattern 3: body: {...} (direct object)
     const directBodyMatch = code.match(/body\s*:\s*(\{[\s\S]*?\})\s*(?:,|\})/);
-    if (directBodyMatch) {
+    if (directBodyMatch && Object.keys(body).length === 0) {
       try {
         let bodyStr = directBodyMatch[1];
         bodyStr = bodyStr.replace(/'/g, '"');
         bodyStr = bodyStr.replace(/,\s*}/g, '}');
+        bodyStr = bodyStr.replace(/,\s*]/g, ']');
         bodyStr = bodyStr.replace(/\n\s*/g, ' ');
         bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
         body = JSON.parse(bodyStr);
-        return body;
+        return { body };
       } catch {
         // Try extracting key-value pairs
         const bodyLines = directBodyMatch[1].match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/g);
@@ -338,6 +386,9 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
               body[parts[1]] = parts[2].trim();
             }
           });
+          if (Object.keys(body).length > 0) {
+            return { body };
+          }
         }
       }
     }
@@ -347,12 +398,13 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     if (stringBodyMatch && Object.keys(body).length === 0) {
       try {
         body = JSON.parse(stringBodyMatch[1]);
+        return { body };
       } catch {
         // Not valid JSON string
       }
     }
     
-    return body;
+    return { body, parseWarning };
   };
 
   // Main parse function
@@ -360,6 +412,7 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     setError(null);
     setParsedApi(null);
     setValidationErrors([]);
+    setParseWarning(null);
 
     if (!code.trim()) {
       setError('Please paste Node.js fetch code');
@@ -415,8 +468,12 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         }
       }
 
-      // Parse body
-      const body = parseBody(code);
+      // Parse body with variable resolution
+      const { body, parseWarning: bodyWarning } = parseBody(code);
+      if (bodyWarning) {
+        setParseWarning(bodyWarning);
+      }
+      
       const hasJsonBody = isJsonBody(body);
 
       // Clean headers with context
@@ -479,6 +536,9 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     setRawCode('');
     setParsedApi(null);
     setApiName('');
+    setError(null);
+    setParseWarning(null);
+    setValidationErrors([]);
     setEnabled(true);
     setProxyEnabled(false);
     setForceProxy(true);
@@ -597,6 +657,17 @@ fetch("https://api.example.com/endpoint", {
                     <li key={i}>{err}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Parse Warning */}
+            {parseWarning && (
+              <div className="space-y-2 p-3 rounded bg-warning/10 border border-warning/30">
+                <div className="flex items-center gap-2 text-warning font-medium text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  Body Parsing Notice
+                </div>
+                <p className="text-xs text-warning">{parseWarning}</p>
               </div>
             )}
 
