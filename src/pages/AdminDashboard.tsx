@@ -59,7 +59,8 @@ const AdminDashboard = () => {
     url: string;
     method: string;
     headers: Record<string, string>;
-    body: Record<string, any>;
+    body: Record<string, unknown>;
+    bodyType?: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none';
     query_params: Record<string, string>;
     enabled: boolean;
     proxy_enabled: boolean;
