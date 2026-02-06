@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Play, Square, Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server } from 'lucide-react';
+import { Play, Square, Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, Shield } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Api {
@@ -45,6 +46,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
   const [hitCount, setHitCount] = useState(0);
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
+  const [useProxy, setUseProxy] = useState(false);
   const abortRef = useRef(false);
 
   const replacePlaceholders = (text: string, phoneNumber: string): string => {
@@ -113,6 +115,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
           headers,
           body,
           bodyType: api.bodyType || 'json',
+          useProxy,
         },
       });
 
@@ -274,6 +277,22 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
               className="bg-input border-primary/30 focus:border-primary"
             />
           </div>
+        </div>
+
+        {/* Proxy Toggle */}
+        <div className="flex items-center justify-between p-3 bg-secondary/10 rounded-lg border border-secondary/30">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-secondary" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Free Proxy</p>
+              <p className="text-xs text-muted-foreground">Route through CORS proxies (slower but bypasses blocks)</p>
+            </div>
+          </div>
+          <Switch
+            checked={useProxy}
+            onCheckedChange={setUseProxy}
+            disabled={isRunning}
+          />
         </div>
 
         {/* Live Status */}

@@ -10,16 +10,16 @@ const browserHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
-  'Accept-Encoding': 'gzip, deflate, br',
   'Cache-Control': 'no-cache',
   'Pragma': 'no-cache',
-  'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-  'Sec-Ch-Ua-Mobile': '?0',
-  'Sec-Ch-Ua-Platform': '"Windows"',
-  'Sec-Fetch-Dest': 'empty',
-  'Sec-Fetch-Mode': 'cors',
-  'Sec-Fetch-Site': 'cross-site',
 };
+
+// Free CORS proxy services (rotated on failure)
+const FREE_PROXIES = [
+  { name: 'allorigins', format: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+  { name: 'corsproxy', format: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` },
+  { name: 'cors-anywhere', format: (url: string) => `https://cors-anywhere.herokuapp.com/${url}` },
+];
 
 interface HitApiRequest {
   url: string;
@@ -27,16 +27,54 @@ interface HitApiRequest {
   headers?: Record<string, string>;
   body?: Record<string, unknown>;
   bodyType?: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none';
+  useProxy?: boolean;
+  proxyIndex?: number;
+}
+
+async function makeRequest(
+  url: string, 
+  method: string, 
+  headers: Record<string, string>, 
+  body: string | undefined,
+  useProxy: boolean,
+  proxyIndex: number
+): Promise<{ response: Response | null; proxyUsed: string | null; error: string | null }> {
+  
+  const targetUrl = useProxy && proxyIndex < FREE_PROXIES.length 
+    ? FREE_PROXIES[proxyIndex].format(url)
+    : url;
+  
+  const proxyName = useProxy && proxyIndex < FREE_PROXIES.length 
+    ? FREE_PROXIES[proxyIndex].name 
+    : 'direct';
+
+  console.log(`[hit-api] Trying ${proxyName}: ${method} ${url}`);
+
+  try {
+    const fetchOptions: RequestInit = {
+      method: method.toUpperCase(),
+      headers,
+    };
+
+    if (body && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+      fetchOptions.body = body;
+    }
+
+    const response = await fetch(targetUrl, fetchOptions);
+    return { response, proxyUsed: proxyName, error: null };
+  } catch (error) {
+    console.error(`[hit-api] ${proxyName} failed:`, error.message);
+    return { response: null, proxyUsed: proxyName, error: error.message };
+  }
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { url, method, headers, body, bodyType = 'json' }: HitApiRequest = await req.json();
+    const { url, method, headers, body, bodyType = 'json', useProxy = false }: HitApiRequest = await req.json();
 
     if (!url || !method) {
       return new Response(
@@ -45,9 +83,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[hit-api] Hitting: ${method} ${url}`);
-
-    // Extract origin/referer from target URL
+    // Extract origin for headers
     let origin = '';
     try {
       const urlObj = new URL(url);
@@ -56,67 +92,94 @@ serve(async (req) => {
       origin = '';
     }
 
-    // Merge browser headers with custom headers (custom headers take priority)
+    // Build final headers
     const finalHeaders: Record<string, string> = {
       ...browserHeaders,
       ...(origin && { 'Origin': origin, 'Referer': origin + '/' }),
       ...headers,
     };
 
-    const fetchOptions: RequestInit = {
-      method: method.toUpperCase(),
-      headers: finalHeaders,
-    };
-
-    // Only add body for methods that support it
+    // Prepare body
+    let requestBody: string | undefined;
     if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && body) {
       if (bodyType === 'form-urlencoded') {
-        fetchOptions.body = new URLSearchParams(body as Record<string, string>).toString();
-        fetchOptions.headers = {
-          ...finalHeaders,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        };
-      } else if (bodyType === 'multipart') {
-        fetchOptions.body = JSON.stringify(body);
-        const headersCopy = { ...finalHeaders };
-        delete headersCopy['Content-Type'];
-        fetchOptions.headers = headersCopy;
+        requestBody = new URLSearchParams(body as Record<string, string>).toString();
+        finalHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
       } else if (bodyType === 'text') {
-        fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
-        const headersCopy = { ...finalHeaders };
-        delete headersCopy['Content-Type'];
-        fetchOptions.headers = headersCopy;
+        requestBody = typeof body === 'string' ? body : JSON.stringify(body);
       } else {
-        fetchOptions.body = JSON.stringify(body);
-        fetchOptions.headers = {
-          ...finalHeaders,
-          'Content-Type': 'application/json',
-        };
+        requestBody = JSON.stringify(body);
+        finalHeaders['Content-Type'] = 'application/json';
       }
     }
 
     const startTime = Date.now();
+    let lastError = '';
+    let proxyUsed = 'direct';
+
+    // Try direct first, then proxies if useProxy is enabled
+    const maxAttempts = useProxy ? FREE_PROXIES.length + 1 : 1;
     
-    const response = await fetch(url, fetchOptions);
-    
-    const responseTime = Date.now() - startTime;
-    const statusCode = response.status;
-    
-    let responseText = '';
-    try {
-      responseText = await response.text();
-    } catch (e) {
-      responseText = 'Unable to read response body';
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const isProxyAttempt = attempt > 0 || useProxy;
+      const proxyIndex = useProxy ? (attempt === 0 ? -1 : attempt - 1) : -1;
+      
+      // For first attempt with useProxy, start with proxy index 0
+      const actualProxyIndex = useProxy ? attempt : -1;
+      const actualUseProxy = actualProxyIndex >= 0 && actualProxyIndex < FREE_PROXIES.length;
+
+      const result = await makeRequest(
+        url,
+        method,
+        finalHeaders,
+        requestBody,
+        actualUseProxy,
+        actualProxyIndex
+      );
+
+      if (result.response) {
+        const responseTime = Date.now() - startTime;
+        const statusCode = result.response.status;
+        
+        let responseText = '';
+        try {
+          responseText = await result.response.text();
+        } catch {
+          responseText = 'Unable to read response body';
+        }
+
+        console.log(`[hit-api] Success via ${result.proxyUsed}: ${statusCode} in ${responseTime}ms`);
+
+        return new Response(
+          JSON.stringify({
+            success: result.response.ok,
+            status_code: statusCode,
+            response_time: responseTime,
+            response_text: responseText.substring(0, 1000),
+            proxy_used: result.proxyUsed,
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      lastError = result.error || 'Unknown error';
+      proxyUsed = result.proxyUsed || 'unknown';
     }
 
-    console.log(`[hit-api] Response: ${statusCode} in ${responseTime}ms`);
+    // All attempts failed
+    const responseTime = Date.now() - startTime;
+    console.error(`[hit-api] All attempts failed. Last error: ${lastError}`);
 
     return new Response(
       JSON.stringify({
-        success: response.ok,
-        status_code: statusCode,
+        success: false,
+        status_code: null,
         response_time: responseTime,
-        response_text: responseText.substring(0, 1000),
+        error_message: `All attempts failed: ${lastError}`,
+        proxy_used: proxyUsed,
       }),
       { 
         status: 200, 
