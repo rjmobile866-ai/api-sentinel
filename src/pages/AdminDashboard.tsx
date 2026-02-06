@@ -4,13 +4,15 @@ import Header from '@/components/dashboard/Header';
 import DisclaimerBanner from '@/components/dashboard/DisclaimerBanner';
 import ApiCard from '@/components/dashboard/ApiCard';
 import ApiForm from '@/components/dashboard/ApiForm';
+import ApiImporter from '@/components/dashboard/ApiImporter';
 import HitEngine from '@/components/dashboard/HitEngine';
 import LogsPanel from '@/components/dashboard/LogsPanel';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
-import { Plus, Database, Loader2, LogOut } from 'lucide-react';
+import { Plus, Database, Loader2, LogOut, Code, List } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
@@ -47,10 +49,24 @@ const AdminDashboard = () => {
     if (data.id) {
       await updateApi(data.id, apiData);
     } else {
-      // Add dummy user_id for unauthenticated API
       await addApi(apiData);
     }
     setEditingApi(null);
+  };
+
+  const handleImportApi = async (apiData: {
+    name: string;
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: Record<string, any>;
+    query_params: Record<string, string>;
+    enabled: boolean;
+    proxy_enabled: boolean;
+    force_proxy: boolean;
+    rotation_enabled: boolean;
+  }) => {
+    await addApi(apiData);
   };
 
   const handleEdit = (api: any) => {
@@ -99,58 +115,85 @@ const AdminDashboard = () => {
         {/* Hit Engine */}
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* APIs Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-primary text-glow flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                APIs ({apis.length})
-              </h2>
-              <Button
-                onClick={() => setFormOpen(true)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add API
-              </Button>
+        {/* Tabs for API Management */}
+        <Tabs defaultValue="apis" className="space-y-4">
+          <TabsList className="bg-muted/30 border border-primary/30">
+            <TabsTrigger value="apis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <List className="w-4 h-4 mr-2" />
+              APIs ({apis.length})
+            </TabsTrigger>
+            <TabsTrigger value="import" className="data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
+              <Code className="w-4 h-4 mr-2" />
+              Import API (Node.js Fetch)
+            </TabsTrigger>
+          </TabsList>
+
+          {/* APIs Tab */}
+          <TabsContent value="apis">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* APIs Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-primary text-glow flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    API List
+                  </h2>
+                  <Button
+                    onClick={() => setFormOpen(true)}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add API
+                  </Button>
+                </div>
+
+                {apisLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  </div>
+                ) : apis.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-primary/30 rounded-lg">
+                    <Database className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">No APIs added yet</p>
+                    <Button
+                      onClick={() => setFormOpen(true)}
+                      variant="outline"
+                      className="mt-4 border-primary/50 text-primary"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First API
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {apis.map((api) => (
+                      <ApiCard
+                        key={api.id}
+                        api={api}
+                        onToggle={toggleApiField}
+                        onEdit={handleEdit}
+                        onDelete={deleteApi}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Logs Section */}
+              <LogsPanel logs={logs} onClear={clearLogs} />
             </div>
+          </TabsContent>
 
-            {apisLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 text-primary animate-spin" />
-              </div>
-            ) : apis.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-primary/30 rounded-lg">
-                <Database className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">No APIs added yet</p>
-                <Button
-                  onClick={() => setFormOpen(true)}
-                  variant="outline"
-                  className="mt-4 border-primary/50 text-primary"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Your First API
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {apis.map((api) => (
-                  <ApiCard
-                    key={api.id}
-                    api={api}
-                    onToggle={toggleApiField}
-                    onEdit={handleEdit}
-                    onDelete={deleteApi}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Logs Section */}
-          <LogsPanel logs={logs} onClear={clearLogs} />
-        </div>
+          {/* Import API Tab */}
+          <TabsContent value="import">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ApiImporter onApiAdd={handleImportApi} />
+              
+              {/* Logs Section */}
+              <LogsPanel logs={logs} onClear={clearLogs} />
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <ApiForm
