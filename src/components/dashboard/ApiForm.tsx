@@ -20,6 +20,7 @@ interface ApiFormData {
   proxy_enabled: boolean;
   force_proxy: boolean;
   rotation_enabled: boolean;
+  residential_proxy_enabled: boolean;
 }
 
 interface ApiFormProps {
@@ -40,6 +41,7 @@ const defaultFormData: ApiFormData = {
   proxy_enabled: false,
   force_proxy: true,
   rotation_enabled: false,
+  residential_proxy_enabled: false,
 };
 
 const ApiForm: React.FC<ApiFormProps> = ({ open, onClose, onSubmit, editData }) => {
@@ -183,6 +185,20 @@ const ApiForm: React.FC<ApiFormProps> = ({ open, onClose, onSubmit, editData }) 
               <Switch
                 checked={formData.rotation_enabled}
                 onCheckedChange={(v) => setFormData({ ...formData, rotation_enabled: v })}
+              />
+            </div>
+          </div>
+
+          {/* Residential Proxy Toggle - Highlighted */}
+          <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium text-purple-400">🏠 Residential Proxy</Label>
+                <p className="text-xs text-muted-foreground mt-1">Use paid residential proxy for this API (bypasses strict blocks)</p>
+              </div>
+              <Switch
+                checked={formData.residential_proxy_enabled}
+                onCheckedChange={(v) => setFormData({ ...formData, residential_proxy_enabled: v })}
               />
             </div>
           </div>

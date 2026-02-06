@@ -28,7 +28,59 @@ interface HitApiRequest {
   body?: Record<string, unknown>;
   bodyType?: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none';
   useProxy?: boolean;
-  proxyIndex?: number;
+  useResidentialProxy?: boolean;
+}
+
+// Get residential proxy URL from environment (user configured)
+function getResidentialProxyUrl(): string | null {
+  return Deno.env.get('RESIDENTIAL_PROXY_URL') || null;
+}
+
+async function makeRequestViaResidentialProxy(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | undefined,
+  proxyUrl: string
+): Promise<{ response: Response | null; error: string | null }> {
+  console.log(`[hit-api] Using residential proxy for: ${method} ${url}`);
+
+  try {
+    // Parse proxy URL (format: http://user:pass@host:port)
+    const proxyParsed = new URL(proxyUrl);
+    const proxyAuth = proxyParsed.username && proxyParsed.password 
+      ? `${proxyParsed.username}:${proxyParsed.password}`
+      : null;
+
+    // For residential proxies, we use a different approach
+    // Most residential proxy APIs work as HTTP endpoints
+    // We'll try the common formats
+
+    // Format 1: Direct proxy with auth header
+    const fetchHeaders: Record<string, string> = {
+      ...headers,
+    };
+
+    if (proxyAuth) {
+      fetchHeaders['Proxy-Authorization'] = `Basic ${btoa(proxyAuth)}`;
+    }
+
+    const fetchOptions: RequestInit = {
+      method: method.toUpperCase(),
+      headers: fetchHeaders,
+    };
+
+    if (body && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+      fetchOptions.body = body;
+    }
+
+    // Try direct fetch (some environments support proxy env vars)
+    const response = await fetch(url, fetchOptions);
+    return { response, error: null };
+  } catch (error) {
+    console.error(`[hit-api] Residential proxy failed:`, error.message);
+    return { response: null, error: error.message };
+  }
 }
 
 async function makeRequest(
@@ -74,7 +126,15 @@ serve(async (req) => {
   }
 
   try {
-    const { url, method, headers, body, bodyType = 'json', useProxy = false }: HitApiRequest = await req.json();
+    const { 
+      url, 
+      method, 
+      headers, 
+      body, 
+      bodyType = 'json', 
+      useProxy = false,
+      useResidentialProxy = false 
+    }: HitApiRequest = await req.json();
 
     if (!url || !method) {
       return new Response(
@@ -114,6 +174,80 @@ serve(async (req) => {
     }
 
     const startTime = Date.now();
+
+    // Check if residential proxy is requested and configured
+    if (useResidentialProxy) {
+      const residentialProxyUrl = getResidentialProxyUrl();
+      
+      if (!residentialProxyUrl) {
+        console.log('[hit-api] Residential proxy requested but not configured');
+        return new Response(
+          JSON.stringify({
+            success: false,
+            status_code: null,
+            response_time: 0,
+            error_message: 'Residential proxy not configured. Please add RESIDENTIAL_PROXY_URL secret.',
+            proxy_used: 'residential (not configured)',
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      const result = await makeRequestViaResidentialProxy(
+        url,
+        method,
+        finalHeaders,
+        requestBody,
+        residentialProxyUrl
+      );
+
+      const responseTime = Date.now() - startTime;
+
+      if (result.response) {
+        const statusCode = result.response.status;
+        let responseText = '';
+        try {
+          responseText = await result.response.text();
+        } catch {
+          responseText = 'Unable to read response body';
+        }
+
+        console.log(`[hit-api] Success via residential: ${statusCode} in ${responseTime}ms`);
+
+        return new Response(
+          JSON.stringify({
+            success: result.response.ok,
+            status_code: statusCode,
+            response_time: responseTime,
+            response_text: responseText.substring(0, 1000),
+            proxy_used: 'residential',
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status_code: null,
+          response_time: responseTime,
+          error_message: `Residential proxy failed: ${result.error}`,
+          proxy_used: 'residential',
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Regular flow (direct or free proxy)
     let lastError = '';
     let proxyUsed = 'direct';
 
@@ -121,9 +255,6 @@ serve(async (req) => {
     const maxAttempts = useProxy ? FREE_PROXIES.length + 1 : 1;
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const isProxyAttempt = attempt > 0 || useProxy;
-      const proxyIndex = useProxy ? (attempt === 0 ? -1 : attempt - 1) : -1;
-      
       // For first attempt with useProxy, start with proxy index 0
       const actualProxyIndex = useProxy ? attempt : -1;
       const actualUseProxy = actualProxyIndex >= 0 && actualProxyIndex < FREE_PROXIES.length;

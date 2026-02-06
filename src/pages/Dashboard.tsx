@@ -46,6 +46,7 @@ const Dashboard = () => {
       proxy_enabled: data.proxy_enabled,
       force_proxy: data.force_proxy,
       rotation_enabled: data.rotation_enabled,
+      residential_proxy_enabled: data.residential_proxy_enabled,
     };
 
     if (data.id) {
@@ -62,6 +63,7 @@ const Dashboard = () => {
       headers: JSON.stringify(api.headers || {}, null, 2),
       body: JSON.stringify(api.body || {}, null, 2),
       query_params: JSON.stringify(api.query_params || {}, null, 2),
+      residential_proxy_enabled: api.residential_proxy_enabled || false,
     });
     setFormOpen(true);
   };

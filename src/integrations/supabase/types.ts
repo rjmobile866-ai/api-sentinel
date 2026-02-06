@@ -73,6 +73,7 @@ export type Database = {
           name: string
           proxy_enabled: boolean | null
           query_params: Json | null
+          residential_proxy_enabled: boolean | null
           rotation_enabled: boolean | null
           updated_at: string
           url: string
@@ -89,6 +90,7 @@ export type Database = {
           name: string
           proxy_enabled?: boolean | null
           query_params?: Json | null
+          residential_proxy_enabled?: boolean | null
           rotation_enabled?: boolean | null
           updated_at?: string
           url: string
@@ -105,6 +107,7 @@ export type Database = {
           name?: string
           proxy_enabled?: boolean | null
           query_params?: Json | null
+          residential_proxy_enabled?: boolean | null
           rotation_enabled?: boolean | null
           updated_at?: string
           url?: string

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Globe, Shield, RotateCcw, Zap } from 'lucide-react';
+import { Trash2, Edit, Globe, Shield, RotateCcw, Zap, Home } from 'lucide-react';
 
 interface Api {
   id: string;
@@ -14,6 +14,7 @@ interface Api {
   proxy_enabled: boolean;
   force_proxy: boolean;
   rotation_enabled: boolean;
+  residential_proxy_enabled?: boolean;
 }
 
 interface ApiCardProps {
@@ -103,6 +104,23 @@ const ApiCard: React.FC<ApiCardProps> = ({ api, onToggle, onEdit, onDelete }) =>
               className="scale-75"
             />
           </div>
+        </div>
+
+        {/* Residential Proxy Toggle - Highlighted */}
+        <div className={`flex items-center justify-between p-2 rounded border ${
+          api.residential_proxy_enabled 
+            ? 'bg-purple-500/20 border-purple-500/50' 
+            : 'bg-muted/20 border-muted/30'
+        }`}>
+          <div className="flex items-center gap-1">
+            <Home className="w-3 h-3 text-purple-400" />
+            <span className="text-xs text-purple-400 font-medium">Residential</span>
+          </div>
+          <Switch
+            checked={api.residential_proxy_enabled || false}
+            onCheckedChange={(v) => onToggle(api.id, 'residential_proxy_enabled', v)}
+            className="scale-75"
+          />
         </div>
 
         {/* Status indicators */}
