@@ -14,6 +14,7 @@ interface Api {
   method: string;
   headers: Record<string, string>;
   body: Record<string, unknown>;
+  bodyType?: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none';
   query_params: Record<string, string>;
   enabled: boolean;
   proxy_enabled: boolean;
@@ -111,6 +112,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
           method: api.method,
           headers,
           body,
+          bodyType: api.bodyType || 'json',
         },
       });
 
