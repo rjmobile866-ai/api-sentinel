@@ -6,14 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, CheckCircle, Code, Zap, Globe, Shield, RotateCcw, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle, Code, Zap, Globe, Shield, RotateCcw, Info, FileText, FileJson } from 'lucide-react';
+
+// Body type enum
+type BodyType = 'none' | 'json' | 'form-urlencoded' | 'multipart' | 'text';
 
 interface ParsedApi {
   name: string;
   url: string;
   method: string;
   headers: Record<string, string>;
-  body: Record<string, unknown>;
+  body: Record<string, unknown> | string;
+  bodyType: BodyType;
   query_params: Record<string, string>;
 }
 
@@ -50,8 +54,6 @@ const HEADERS_TO_REMOVE = [
   'upgrade-insecure-requests',
   'cache-control',
   'pragma',
-  'referer',
-  'origin',
 ];
 
 // sec-* headers pattern - all headers starting with sec- are removed
@@ -88,11 +90,28 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     return HEADERS_TO_REMOVE.includes(normalizedKey);
   };
 
-  // Clean and normalize headers
+  // Get proper casing for common headers
+  const getProperHeaderCasing = (header: string): string => {
+    const casingMap: Record<string, string> = {
+      'content-type': 'Content-Type',
+      'accept': 'Accept',
+      'authorization': 'Authorization',
+      'x-requested-with': 'X-Requested-With',
+      'x-api-key': 'X-API-Key',
+      'x-auth-token': 'X-Auth-Token',
+      'origin': 'Origin',
+      'referer': 'Referer',
+    };
+    
+    const normalized = normalizeHeaderKey(header);
+    return casingMap[normalized] || header;
+  };
+
+  // Clean and normalize headers based on body type
   const cleanHeaders = (
     headers: Record<string, string>, 
     method: string, 
-    hasJsonBody: boolean
+    bodyType: BodyType
   ): Record<string, string> => {
     const normalizedHeaders: Map<string, { originalKey: string; value: string }> = new Map();
     
@@ -127,49 +146,62 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
       cleaned[properKey] = value;
     }
     
-    // Auto-add Content-Type for POST/PUT/PATCH with JSON body
-    if (['POST', 'PUT', 'PATCH'].includes(method) && hasJsonBody) {
-      const hasContentType = normalizedHeaders.has('content-type');
-      if (!hasContentType) {
-        cleaned['Content-Type'] = 'application/json';
-      }
-    }
+    // Content-Type handling based on body type
+    const hasContentType = normalizedHeaders.has('content-type');
     
-    // Auto-add Accept header for JSON body requests
-    if (hasJsonBody) {
-      const hasAccept = normalizedHeaders.has('accept');
-      if (!hasAccept) {
-        cleaned['Accept'] = 'application/json';
-      }
-    }
-    
-    // Remove Content-Type for GET requests (shouldn't have body)
-    if (method === 'GET') {
-      delete cleaned['Content-Type'];
-      // Also check lowercase version
+    // For GET/HEAD - no body, no Content-Type
+    if (['GET', 'HEAD'].includes(method)) {
+      // Remove any Content-Type
       for (const key of Object.keys(cleaned)) {
         if (normalizeHeaderKey(key) === 'content-type') {
           delete cleaned[key];
         }
       }
+    } else {
+      // For POST/PUT/PATCH - set Content-Type based on body type
+      switch (bodyType) {
+        case 'json':
+          if (!hasContentType) {
+            cleaned['Content-Type'] = 'application/json';
+          }
+          // Also add Accept header for JSON
+          if (!normalizedHeaders.has('accept')) {
+            cleaned['Accept'] = 'application/json';
+          }
+          break;
+          
+        case 'form-urlencoded':
+          if (!hasContentType) {
+            cleaned['Content-Type'] = 'application/x-www-form-urlencoded';
+          }
+          break;
+          
+        case 'multipart':
+          // DO NOT set Content-Type - browser/runtime sets with boundary
+          for (const key of Object.keys(cleaned)) {
+            if (normalizeHeaderKey(key) === 'content-type') {
+              delete cleaned[key];
+            }
+          }
+          break;
+          
+        case 'text':
+          // Don't auto-add Content-Type for plain text (user choice)
+          break;
+          
+        case 'none':
+        default:
+          // No body, remove Content-Type
+          for (const key of Object.keys(cleaned)) {
+            if (normalizeHeaderKey(key) === 'content-type') {
+              delete cleaned[key];
+            }
+          }
+          break;
+      }
     }
     
     return cleaned;
-  };
-
-  // Get proper casing for common headers
-  const getProperHeaderCasing = (header: string): string => {
-    const casingMap: Record<string, string> = {
-      'content-type': 'Content-Type',
-      'accept': 'Accept',
-      'authorization': 'Authorization',
-      'x-requested-with': 'X-Requested-With',
-      'x-api-key': 'X-API-Key',
-      'x-auth-token': 'X-Auth-Token',
-    };
-    
-    const normalized = normalizeHeaderKey(header);
-    return casingMap[normalized] || header;
   };
 
   // Extract query params from URL
@@ -222,13 +254,6 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     }
   };
 
-  // Check if body is JSON
-  const isJsonBody = (body: unknown): boolean => {
-    if (body === null || body === undefined) return false;
-    if (typeof body === 'object' && Object.keys(body as object).length > 0) return true;
-    return false;
-  };
-
   // Validate URL
   const isValidUrl = (url: string): boolean => {
     try {
@@ -260,8 +285,8 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
       errors.push('API name is required (minimum 2 characters)');
     }
     
-    // Validate body JSON (if present)
-    if (['POST', 'PUT', 'PATCH'].includes(api.method) && Object.keys(api.body).length > 0) {
+    // Validate body based on type
+    if (api.bodyType === 'json' && typeof api.body === 'object') {
       try {
         JSON.stringify(api.body);
       } catch {
@@ -275,136 +300,285 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     };
   };
 
-  // Parse body from code with variable resolution
-  const parseBody = (code: string): { body: Record<string, unknown>; parseWarning?: string } => {
+  // Parse URLSearchParams from code
+  const parseURLSearchParams = (code: string, varName: string): { data: Record<string, string>; found: boolean } => {
+    const data: Record<string, string> = {};
+    
+    // Find all append calls for this variable
+    // Pattern: varName.append('key', 'value') or varName.append("key", "value")
+    const appendPattern = new RegExp(`${varName}\\.append\\s*\\(\\s*["'\`]([^"'\`]+)["'\`]\\s*,\\s*["'\`]([^"'\`]*)["'\`]\\s*\\)`, 'g');
+    
+    let match;
+    while ((match = appendPattern.exec(code)) !== null) {
+      data[match[1]] = match[2];
+    }
+    
+    // Also check for set calls
+    const setPattern = new RegExp(`${varName}\\.set\\s*\\(\\s*["'\`]([^"'\`]+)["'\`]\\s*,\\s*["'\`]([^"'\`]*)["'\`]\\s*\\)`, 'g');
+    while ((match = setPattern.exec(code)) !== null) {
+      data[match[1]] = match[2];
+    }
+    
+    return { data, found: Object.keys(data).length > 0 };
+  };
+
+  // Parse FormData from code
+  const parseFormData = (code: string, varName: string): { fields: string[]; found: boolean } => {
+    const fields: string[] = [];
+    
+    // Find all append calls for this variable
+    const appendPattern = new RegExp(`${varName}\\.append\\s*\\(\\s*["'\`]([^"'\`]+)["'\`]`, 'g');
+    
+    let match;
+    while ((match = appendPattern.exec(code)) !== null) {
+      if (!fields.includes(match[1])) {
+        fields.push(match[1]);
+      }
+    }
+    
+    return { fields, found: fields.length > 0 };
+  };
+
+  // Parse JSON body with variable resolution
+  const parseJsonBody = (code: string): { body: Record<string, unknown>; found: boolean } => {
     let body: Record<string, unknown> = {};
-    let parseWarning: string | undefined;
     
     // Pattern 1: body: JSON.stringify({...})
     const jsonStringifyInlineMatch = code.match(/body\s*:\s*JSON\.stringify\s*\(\s*(\{[\s\S]*?\})\s*\)/);
     if (jsonStringifyInlineMatch) {
       try {
         let bodyStr = jsonStringifyInlineMatch[1];
-        bodyStr = bodyStr.replace(/'/g, '"');
-        bodyStr = bodyStr.replace(/,\s*}/g, '}');
-        bodyStr = bodyStr.replace(/,\s*]/g, ']');
-        bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-        bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+        bodyStr = normalizeJsonString(bodyStr);
         body = JSON.parse(bodyStr);
-        return { body };
+        return { body, found: true };
       } catch {
         // Continue to other patterns
       }
     }
     
-    // Pattern 2: body: variable (variable resolution)
-    const bodyVarMatch = code.match(/body\s*:\s*([a-zA-Z_]\w*)\s*[,}]/);
-    if (bodyVarMatch && Object.keys(body).length === 0) {
-      const varName = bodyVarMatch[1];
-      
-      // Try to find JSON.stringify(object) definition
-      // Pattern: const varName = JSON.stringify({...})
-      const jsonStringifyVarMatch = code.match(
-        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*JSON\\.stringify\\s*\\(\\s*(\\{[\\s\\S]*?\\})\\s*\\)`)
-      );
-      
-      if (jsonStringifyVarMatch) {
-        try {
-          let bodyStr = jsonStringifyVarMatch[1];
-          bodyStr = bodyStr.replace(/'/g, '"');
-          bodyStr = bodyStr.replace(/,\s*}/g, '}');
-          bodyStr = bodyStr.replace(/,\s*]/g, ']');
-          bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-          bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
-          body = JSON.parse(bodyStr);
-          return { body };
-        } catch {
-          // Continue
-        }
-      }
-      
-      // Pattern: const varName = {...} (direct object)
-      const objectVarMatch = code.match(
-        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*(\\{[\\s\\S]*?\\})\\s*[;\\n]`)
-      );
-      
-      if (objectVarMatch) {
-        try {
-          let bodyStr = objectVarMatch[1];
-          bodyStr = bodyStr.replace(/'/g, '"');
-          bodyStr = bodyStr.replace(/,\s*}/g, '}');
-          bodyStr = bodyStr.replace(/,\s*]/g, ']');
-          bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-          bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
-          body = JSON.parse(bodyStr);
-          return { body };
-        } catch {
-          // Continue
-        }
-      }
-      
-      // Pattern: const varName = "json string"
-      const stringVarMatch = code.match(
-        new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*["'\`]([\s\\S]*?)["'\`]\\s*[;\\n]`)
-      );
-      
-      if (stringVarMatch) {
-        try {
-          body = JSON.parse(stringVarMatch[1]);
-          return { body };
-        } catch {
-          // Not valid JSON string
-        }
-      }
-      
-      // If variable definition not found but body uses a variable
-      if (Object.keys(body).length === 0) {
-        parseWarning = `Body variable "${varName}" found but definition not detected. Please check or manually enter body.`;
-        return { body, parseWarning };
-      }
-    }
-    
-    // Pattern 3: body: {...} (direct object)
+    // Pattern 2: body: {...} (direct object)
     const directBodyMatch = code.match(/body\s*:\s*(\{[\s\S]*?\})\s*(?:,|\})/);
     if (directBodyMatch && Object.keys(body).length === 0) {
       try {
         let bodyStr = directBodyMatch[1];
-        bodyStr = bodyStr.replace(/'/g, '"');
-        bodyStr = bodyStr.replace(/,\s*}/g, '}');
-        bodyStr = bodyStr.replace(/,\s*]/g, ']');
-        bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-        bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+        bodyStr = normalizeJsonString(bodyStr);
         body = JSON.parse(bodyStr);
-        return { body };
+        return { body, found: true };
       } catch {
         // Try extracting key-value pairs
-        const bodyLines = directBodyMatch[1].match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/g);
-        if (bodyLines) {
-          bodyLines.forEach(line => {
-            const parts = line.match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/);
-            if (parts) {
-              body[parts[1]] = parts[2].trim();
-            }
-          });
-          if (Object.keys(body).length > 0) {
-            return { body };
-          }
+        const kvResult = extractKeyValuePairs(directBodyMatch[1]);
+        if (Object.keys(kvResult).length > 0) {
+          return { body: kvResult, found: true };
         }
       }
     }
     
-    // Pattern 4: body: "json string"
+    // Pattern 3: body: "json string" or body: 'json string'
     const stringBodyMatch = code.match(/body\s*:\s*["'`]([\s\S]*?)["'`]\s*[,}]/);
     if (stringBodyMatch && Object.keys(body).length === 0) {
       try {
         body = JSON.parse(stringBodyMatch[1]);
-        return { body };
+        return { body, found: true };
       } catch {
         // Not valid JSON string
       }
     }
     
-    return { body, parseWarning };
+    return { body, found: false };
+  };
+
+  // Normalize JS object string to valid JSON
+  const normalizeJsonString = (str: string): string => {
+    let result = str;
+    // Replace single quotes with double quotes
+    result = result.replace(/'/g, '"');
+    // Remove trailing commas before } or ]
+    result = result.replace(/,\s*}/g, '}');
+    result = result.replace(/,\s*]/g, ']');
+    // Normalize whitespace
+    result = result.replace(/\n\s*/g, ' ');
+    // Add quotes to unquoted keys
+    result = result.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+    return result;
+  };
+
+  // Extract key-value pairs from object-like string
+  const extractKeyValuePairs = (str: string): Record<string, unknown> => {
+    const body: Record<string, unknown> = {};
+    const kvPattern = /["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/g;
+    let match;
+    while ((match = kvPattern.exec(str)) !== null) {
+      body[match[1]] = match[2].trim();
+    }
+    return body;
+  };
+
+  // Resolve variable and determine body type
+  const resolveBodyVariable = (code: string, varName: string): { 
+    body: Record<string, unknown> | string; 
+    bodyType: BodyType; 
+    found: boolean;
+    warning?: string;
+  } => {
+    // Check if it's URLSearchParams
+    const urlSearchParamsPattern = new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*new\\s+URLSearchParams\\s*\\(`);
+    if (urlSearchParamsPattern.test(code)) {
+      const { data, found } = parseURLSearchParams(code, varName);
+      if (found) {
+        return { body: data, bodyType: 'form-urlencoded', found: true };
+      }
+      return { body: {}, bodyType: 'form-urlencoded', found: true, warning: `URLSearchParams "${varName}" detected but no .append() calls found` };
+    }
+    
+    // Check if it's FormData
+    const formDataPattern = new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*new\\s+FormData\\s*\\(`);
+    if (formDataPattern.test(code)) {
+      const { fields, found } = parseFormData(code, varName);
+      if (found) {
+        // For FormData, store field names as placeholders
+        const placeholderBody: Record<string, string> = {};
+        fields.forEach(field => {
+          placeholderBody[field] = `[${field}]`;
+        });
+        return { body: placeholderBody, bodyType: 'multipart', found: true };
+      }
+      return { body: {}, bodyType: 'multipart', found: true, warning: `FormData "${varName}" detected but no .append() calls found` };
+    }
+    
+    // Check if it's JSON.stringify(object)
+    const jsonStringifyVarMatch = code.match(
+      new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*JSON\\.stringify\\s*\\(\\s*(\\{[\\s\\S]*?\\})\\s*\\)`)
+    );
+    if (jsonStringifyVarMatch) {
+      try {
+        let bodyStr = normalizeJsonString(jsonStringifyVarMatch[1]);
+        const body = JSON.parse(bodyStr);
+        return { body, bodyType: 'json', found: true };
+      } catch {
+        // Continue
+      }
+    }
+    
+    // Check if it's a direct object: const varName = {...}
+    const objectVarMatch = code.match(
+      new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*(\\{[\\s\\S]*?\\})\\s*[;\\n]`)
+    );
+    if (objectVarMatch) {
+      try {
+        let bodyStr = normalizeJsonString(objectVarMatch[1]);
+        const body = JSON.parse(bodyStr);
+        return { body, bodyType: 'json', found: true };
+      } catch {
+        const kvResult = extractKeyValuePairs(objectVarMatch[1]);
+        if (Object.keys(kvResult).length > 0) {
+          return { body: kvResult, bodyType: 'json', found: true };
+        }
+      }
+    }
+    
+    // Check if it's a string variable: const varName = "..."
+    const stringVarMatch = code.match(
+      new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*["'\`]([\\s\\S]*?)["'\`]\\s*[;\\n]`)
+    );
+    if (stringVarMatch) {
+      // Try to parse as JSON
+      try {
+        const body = JSON.parse(stringVarMatch[1]);
+        return { body, bodyType: 'json', found: true };
+      } catch {
+        // It's plain text
+        return { body: stringVarMatch[1], bodyType: 'text', found: true };
+      }
+    }
+    
+    return { 
+      body: {}, 
+      bodyType: 'none', 
+      found: false, 
+      warning: `Body variable "${varName}" found but definition not detected in the code.` 
+    };
+  };
+
+  // Main body parsing function
+  const parseBody = (code: string, method: string): { 
+    body: Record<string, unknown> | string; 
+    bodyType: BodyType; 
+    warning?: string; 
+  } => {
+    // GET/HEAD methods should not have body
+    if (['GET', 'HEAD'].includes(method)) {
+      return { body: {}, bodyType: 'none' };
+    }
+    
+    // Check if there's a body property in the code
+    const hasBodyProperty = /body\s*:/.test(code);
+    if (!hasBodyProperty) {
+      return { body: {}, bodyType: 'none' };
+    }
+    
+    // Check for variable reference: body: varName
+    const bodyVarMatch = code.match(/body\s*:\s*([a-zA-Z_]\w*)\s*[,}]/);
+    if (bodyVarMatch) {
+      const varName = bodyVarMatch[1];
+      
+      // Skip if it's JSON.stringify (handled separately)
+      if (varName !== 'JSON') {
+        const resolved = resolveBodyVariable(code, varName);
+        if (resolved.found) {
+          return { body: resolved.body, bodyType: resolved.bodyType, warning: resolved.warning };
+        } else if (resolved.warning) {
+          return { body: {}, bodyType: 'none', warning: resolved.warning };
+        }
+      }
+    }
+    
+    // Try to parse as JSON body
+    const jsonResult = parseJsonBody(code);
+    if (jsonResult.found && Object.keys(jsonResult.body).length > 0) {
+      return { body: jsonResult.body, bodyType: 'json' };
+    }
+    
+    // Check for plain text body: body: "text" (not JSON)
+    const plainTextMatch = code.match(/body\s*:\s*["'`]([^{}[\]"'`]+)["'`]\s*[,}]/);
+    if (plainTextMatch) {
+      // Verify it's not JSON
+      try {
+        JSON.parse(plainTextMatch[1]);
+        // It's valid JSON, treat as json
+        return { body: JSON.parse(plainTextMatch[1]), bodyType: 'json' };
+      } catch {
+        // It's plain text
+        return { body: plainTextMatch[1], bodyType: 'text', warning: 'Plain text body detected. Content-Type not auto-set.' };
+      }
+    }
+    
+    // Check for new URLSearchParams() directly in body
+    if (/body\s*:\s*new\s+URLSearchParams\s*\(/.test(code)) {
+      // Try to find inline URLSearchParams creation
+      const inlineMatch = code.match(/body\s*:\s*new\s+URLSearchParams\s*\(\s*(\{[\s\S]*?\})\s*\)/);
+      if (inlineMatch) {
+        try {
+          const bodyStr = normalizeJsonString(inlineMatch[1]);
+          const body = JSON.parse(bodyStr);
+          return { body, bodyType: 'form-urlencoded' };
+        } catch {
+          // Extract KV pairs
+          const kvResult = extractKeyValuePairs(inlineMatch[1]);
+          if (Object.keys(kvResult).length > 0) {
+            return { body: kvResult, bodyType: 'form-urlencoded' };
+          }
+        }
+      }
+      return { body: {}, bodyType: 'form-urlencoded', warning: 'URLSearchParams detected but could not parse. Please enter body manually.' };
+    }
+    
+    // Check for new FormData() directly in body
+    if (/body\s*:\s*new\s+FormData\s*\(/.test(code)) {
+      return { body: {}, bodyType: 'multipart', warning: 'FormData detected. Fields shown as placeholders.' };
+    }
+    
+    // If body property exists but we couldn't parse, show warning
+    return { body: {}, bodyType: 'none', warning: 'Body detected but could not auto-parse. Please enter body manually.' };
   };
 
   // Main parse function
@@ -468,16 +642,14 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         }
       }
 
-      // Parse body with variable resolution
-      const { body, parseWarning: bodyWarning } = parseBody(code);
+      // Parse body with type detection
+      const { body, bodyType, warning: bodyWarning } = parseBody(code, method);
       if (bodyWarning) {
         setParseWarning(bodyWarning);
       }
-      
-      const hasJsonBody = isJsonBody(body);
 
-      // Clean headers with context
-      const cleanedHeaders = cleanHeaders(headers, method, hasJsonBody);
+      // Clean headers based on body type
+      const cleanedHeaders = cleanHeaders(headers, method, bodyType);
 
       // Generate meaningful name
       const generatedName = generateApiName(cleanUrl, method);
@@ -495,6 +667,7 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         method,
         headers: cleanedHeaders,
         body,
+        bodyType,
         query_params: queryParams,
       };
 
@@ -519,12 +692,17 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
 
     setValidationErrors([]);
 
+    // Convert body to object format for storage
+    const bodyForStorage: Record<string, unknown> = typeof parsedApi.body === 'string' 
+      ? { __rawText: parsedApi.body } 
+      : parsedApi.body as Record<string, unknown>;
+
     onApiAdd({
       name: apiName || parsedApi.name,
       url: parsedApi.url,
       method: parsedApi.method,
       headers: parsedApi.headers,
-      body: parsedApi.body,
+      body: bodyForStorage,
       query_params: parsedApi.query_params,
       enabled,
       proxy_enabled: proxyEnabled,
@@ -545,7 +723,7 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     setRotationEnabled(false);
   };
 
-  // Get error message for status codes
+  // Get status error hint
   const getStatusErrorHint = (statusCode: number): string => {
     switch (statusCode) {
       case 400:
@@ -573,20 +751,49 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     PATCH: 'bg-accent/20 text-accent border-accent/30',
   };
 
+  const bodyTypeBadge: Record<BodyType, { label: string; className: string; icon: React.ReactNode }> = {
+    'none': { label: 'No Body', className: 'bg-muted/30 text-muted-foreground border-muted/50', icon: null },
+    'json': { label: 'JSON', className: 'bg-secondary/20 text-secondary border-secondary/30', icon: <FileJson className="w-3 h-3" /> },
+    'form-urlencoded': { label: 'URL Encoded', className: 'bg-primary/20 text-primary border-primary/30', icon: <FileText className="w-3 h-3" /> },
+    'multipart': { label: 'Multipart/FormData', className: 'bg-warning/20 text-warning border-warning/30', icon: <FileText className="w-3 h-3" /> },
+    'text': { label: 'Plain Text', className: 'bg-accent/20 text-accent border-accent/30', icon: <FileText className="w-3 h-3" /> },
+  };
+
   // Build preview of what will be sent
   const buildRequestPreview = () => {
     if (!parsedApi) return null;
 
-    const preview = {
+    const preview: Record<string, unknown> = {
       method: parsedApi.method,
       url: parsedApi.url + (Object.keys(parsedApi.query_params).length > 0 
         ? '?' + new URLSearchParams(parsedApi.query_params).toString() 
         : ''),
       headers: parsedApi.headers,
-      ...(Object.keys(parsedApi.body).length > 0 && { body: parsedApi.body }),
     };
 
+    // Add body based on type
+    if (parsedApi.bodyType !== 'none') {
+      if (typeof parsedApi.body === 'string') {
+        preview.body = parsedApi.body;
+      } else if (Object.keys(parsedApi.body).length > 0) {
+        preview.body = parsedApi.body;
+      }
+    }
+
     return preview;
+  };
+
+  // Format body for display
+  const formatBodyDisplay = (): string => {
+    if (!parsedApi) return '';
+    
+    if (parsedApi.bodyType === 'none') return '';
+    
+    if (typeof parsedApi.body === 'string') {
+      return parsedApi.body;
+    }
+    
+    return JSON.stringify(parsedApi.body, null, 2);
   };
 
   return (
@@ -602,16 +809,22 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         <CardContent className="space-y-4">
           <Textarea
             placeholder={`// Paste your Node.js fetch code here (from Reqable)
-// Example:
-fetch("https://api.example.com/endpoint", {
+// Supports: JSON, URLSearchParams, FormData, Plain Text
+
+// Example 1 - JSON:
+fetch("https://api.example.com/login", {
   method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer token"
-  },
-  body: JSON.stringify({
-    "phone": "{PHONE}"
-  })
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ phone: "123456" })
+})
+
+// Example 2 - URLSearchParams:
+const data = new URLSearchParams();
+data.append('username', 'user');
+data.append('password', 'pass');
+fetch("https://api.example.com/login", {
+  method: "POST",
+  body: data
 })`}
             value={rawCode}
             onChange={(e) => setRawCode(e.target.value)}
@@ -665,7 +878,7 @@ fetch("https://api.example.com/endpoint", {
               <div className="space-y-2 p-3 rounded bg-warning/10 border border-warning/30">
                 <div className="flex items-center gap-2 text-warning font-medium text-sm">
                   <AlertCircle className="w-4 h-4" />
-                  Body Parsing Notice
+                  Parsing Notice
                 </div>
                 <p className="text-xs text-warning">{parseWarning}</p>
               </div>
@@ -695,6 +908,20 @@ fetch("https://api.example.com/endpoint", {
               </div>
             </div>
 
+            {/* Body Type Badge */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Body Type</Label>
+              <div className="flex items-center gap-2">
+                <Badge className={`${bodyTypeBadge[parsedApi.bodyType].className} border flex items-center gap-1`}>
+                  {bodyTypeBadge[parsedApi.bodyType].icon}
+                  {bodyTypeBadge[parsedApi.bodyType].label}
+                </Badge>
+                {parsedApi.bodyType === 'multipart' && (
+                  <span className="text-xs text-muted-foreground">(Content-Type set at runtime)</span>
+                )}
+              </div>
+            </div>
+
             {/* Headers */}
             <div className="space-y-2">
               <Label className="text-muted-foreground flex items-center gap-2">
@@ -713,12 +940,18 @@ fetch("https://api.example.com/endpoint", {
             </div>
 
             {/* Body */}
-            {Object.keys(parsedApi.body).length > 0 && (
+            {parsedApi.bodyType !== 'none' && (
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Body (JSON)</Label>
+                <Label className="text-muted-foreground flex items-center gap-2">
+                  Body
+                  {parsedApi.bodyType === 'json' && <Badge variant="outline" className="text-[10px] h-4">JSON</Badge>}
+                  {parsedApi.bodyType === 'form-urlencoded' && <Badge variant="outline" className="text-[10px] h-4">Form</Badge>}
+                  {parsedApi.bodyType === 'multipart' && <Badge variant="outline" className="text-[10px] h-4">Multipart</Badge>}
+                  {parsedApi.bodyType === 'text' && <Badge variant="outline" className="text-[10px] h-4">Text</Badge>}
+                </Label>
                 <div className="bg-muted/30 p-2 rounded border border-muted/50 max-h-32 overflow-auto">
                   <pre className="text-xs font-mono whitespace-pre-wrap">
-                    {JSON.stringify(parsedApi.body, null, 2)}
+                    {formatBodyDisplay() || <span className="text-muted-foreground">Empty</span>}
                   </pre>
                 </div>
               </div>
@@ -788,11 +1021,25 @@ fetch("https://api.example.com/endpoint", {
               </div>
             )}
 
-            {/* Info about auto-added headers */}
-            {parsedApi.method !== 'GET' && Object.keys(parsedApi.body).length > 0 && (
+            {/* Info about auto-added headers based on body type */}
+            {parsedApi.bodyType === 'json' && (
               <div className="flex items-start gap-2 p-2 rounded bg-secondary/10 border border-secondary/30 text-secondary text-xs">
                 <Info className="w-4 h-4 shrink-0" />
-                <span>Content-Type & Accept headers auto-added for JSON body</span>
+                <span>Content-Type & Accept headers auto-set for JSON body</span>
+              </div>
+            )}
+            
+            {parsedApi.bodyType === 'form-urlencoded' && (
+              <div className="flex items-start gap-2 p-2 rounded bg-primary/10 border border-primary/30 text-primary text-xs">
+                <Info className="w-4 h-4 shrink-0" />
+                <span>Content-Type auto-set to application/x-www-form-urlencoded</span>
+              </div>
+            )}
+            
+            {parsedApi.bodyType === 'multipart' && (
+              <div className="flex items-start gap-2 p-2 rounded bg-warning/10 border border-warning/30 text-warning text-xs">
+                <Info className="w-4 h-4 shrink-0" />
+                <span>FormData detected - Content-Type will be set at runtime with boundary</span>
               </div>
             )}
 
