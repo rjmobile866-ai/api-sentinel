@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, AlertCircle, X } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -217,122 +217,107 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
   return (
     <Card className="border-primary/30 bg-card/50 backdrop-blur">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-primary text-glow">
+      <CardHeader className="py-2 px-3">
+        <CardTitle className="flex items-center justify-between text-primary text-glow text-sm">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5" />
-            QUICK HIT ENGINE
+            <Zap className="w-4 h-4" />
+            QUICK HIT
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="border-primary/50 text-primary">
-              <Server className="w-3 h-3 mr-1" />
-              SERVER
-            </Badge>
-            <Badge variant="secondary">{enabledApis.length}/{apis.length} APIs</Badge>
-          </div>
+          <Badge variant="secondary" className="text-[10px] px-1.5">
+            {enabledApis.length}/{apis.length} APIs
+          </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-3 pb-3">
         {/* Phone Input */}
-        <div className="space-y-2">
-          <Label className="text-muted-foreground flex items-center gap-2">
-            <Phone className="w-4 h-4" />
+        <div className="space-y-1">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Phone className="w-3 h-3" />
             Phone Number
           </Label>
           <Input
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-            placeholder="Enter phone number"
-            className="bg-input border-primary/30 focus:border-primary text-lg tracking-wider"
+            placeholder="91XXXXXXXXXX"
+            className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
             maxLength={15}
           />
         </div>
 
-        {/* Delay Control */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1 space-y-2">
-            <Label className="text-muted-foreground flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Delay: {delay}ms
-            </Label>
-            <Input
-              type="range"
-              min="0"
-              max="2000"
-              step="100"
-              value={delay}
-              onChange={(e) => setDelay(Number(e.target.value))}
-              className="cursor-pointer"
-            />
-          </div>
+        {/* Delay Control - Compact */}
+        <div className="flex items-center gap-3">
+          <Label className="text-muted-foreground flex items-center gap-1 text-xs shrink-0">
+            <Clock className="w-3 h-3" />
+            {delay}ms
+          </Label>
+          <Input
+            type="range"
+            min="0"
+            max="2000"
+            step="100"
+            value={delay}
+            onChange={(e) => setDelay(Number(e.target.value))}
+            className="cursor-pointer flex-1 h-2"
+          />
         </div>
 
-        {/* Stats */}
+        {/* Stats - Compact Inline */}
         {(hitCount > 0 || isRunning) && (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="p-2 bg-muted/10 rounded text-center">
-              <Activity className="w-4 h-4 mx-auto text-primary mb-1" />
-              <p className="text-lg font-bold text-primary">{hitCount}</p>
-              <p className="text-xs text-muted-foreground">Hits</p>
+          <div className="flex items-center justify-center gap-4 p-2 bg-muted/10 rounded-lg">
+            <div className="flex items-center gap-1">
+              <Activity className="w-3 h-3 text-secondary" />
+              <span className="text-sm font-bold text-secondary">{hitCount}</span>
             </div>
-            <div className="p-2 bg-primary/10 rounded text-center">
-              <Wifi className="w-4 h-4 mx-auto text-primary mb-1" />
-              <p className="text-lg font-bold text-primary">{successCount}</p>
-              <p className="text-xs text-muted-foreground">Success</p>
+            <div className="flex items-center gap-1">
+              <Wifi className="w-3 h-3 text-accent" />
+              <span className="text-sm font-bold text-accent">{successCount}</span>
             </div>
-            <div className="p-2 bg-destructive/10 rounded text-center">
-              <RotateCcw className="w-4 h-4 mx-auto text-destructive mb-1" />
-              <p className="text-lg font-bold text-destructive">{failCount}</p>
-              <p className="text-xs text-muted-foreground">Failed</p>
+            <div className="flex items-center gap-1">
+              <RotateCcw className="w-3 h-3 text-destructive" />
+              <span className="text-sm font-bold text-destructive">{failCount}</span>
             </div>
           </div>
         )}
 
         {/* Current API indicator */}
         {currentApi && (
-          <div className="p-2 bg-primary/10 rounded-lg border border-primary/30 animate-pulse">
-            <p className="text-xs text-primary text-center">
-              🔥 Hitting: <span className="font-bold">{currentApi}</span>
+          <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/30 animate-pulse">
+            <p className="text-xs text-primary text-center truncate">
+              🔥 <span className="font-bold">{currentApi}</span>
             </p>
           </div>
         )}
 
         {/* No APIs Warning */}
         {apis.length === 0 && (
-          <div className="p-3 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
+          <div className="p-2 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
+            <AlertCircle className="w-3 h-3 text-warning shrink-0" />
             <p className="text-xs text-warning">
-              Koi API nahi hai. <a href="/admin" className="underline font-bold">Admin Panel</a> me APIs add karo.
+              <a href="/admin" className="underline font-bold">Admin</a> me APIs add karo.
             </p>
           </div>
         )}
 
         {/* Action Button */}
-        <div className="flex gap-2">
-          {isRunning ? (
-            <Button
-              onClick={handleStop}
-              variant="destructive"
-              className="flex-1 glow-destructive"
-            >
-              <X className="w-4 h-4 mr-2" />
-              STOP
-            </Button>
-          ) : (
-            <Button
-              onClick={handleQuickHit}
-              disabled={!phone || phone.length < 10 || enabledApis.length === 0}
-              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
-            >
-              <Zap className="w-4 h-4 mr-2" />
-              QUICK HIT ({enabledApis.length} APIs)
-            </Button>
-          )}
-        </div>
-
-        <p className="text-xs text-muted-foreground text-center">
-          APIs manage karo: <a href="/admin" className="text-primary underline">/admin</a>
-        </p>
+        {isRunning ? (
+          <Button
+            onClick={handleStop}
+            variant="destructive"
+            className="w-full glow-destructive h-10"
+          >
+            <X className="w-4 h-4 mr-2" />
+            STOP
+          </Button>
+        ) : (
+          <Button
+            onClick={handleQuickHit}
+            disabled={!phone || phone.length < 10 || enabledApis.length === 0}
+            className="w-full bg-gradient-to-r from-primary via-secondary to-accent text-white font-bold h-10 glow-primary hover:opacity-90"
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            HIT ({enabledApis.length})
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
