@@ -45,7 +45,19 @@ export const useApis = () => {
     }
   };
 
-  const addApi = async (apiData: Omit<Api, 'id'>) => {
+  const addApi = async (apiData: Omit<Api, 'id'>): Promise<{ success: boolean; isDuplicate: boolean }> => {
+    // Check for duplicate (same URL and method)
+    const existingApi = apis.find(
+      api => api.url.toLowerCase() === apiData.url.toLowerCase() && 
+             api.method.toUpperCase() === apiData.method.toUpperCase()
+    );
+
+    if (existingApi) {
+      toast.warning(`⚠️ Duplicate detected: "${existingApi.name}" has same URL and method. Adding anyway.`, {
+        duration: 5000,
+      });
+    }
+
     const newApi: Api = {
       id: Math.random().toString(36).substr(2, 9),
       ...apiData,
@@ -54,7 +66,9 @@ export const useApis = () => {
     const updated = [...apis, newApi];
     setApis(updated);
     saveToStorage(updated);
-    toast.success('API added');
+    toast.success('API added successfully');
+    
+    return { success: true, isDuplicate: !!existingApi };
   };
 
   const updateApi = async (id: string, updates: Partial<Api>) => {
