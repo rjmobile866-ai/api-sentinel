@@ -7,18 +7,21 @@ import ApiForm from '@/components/dashboard/ApiForm';
 import ApiImporter from '@/components/dashboard/ApiImporter';
 import HitEngine from '@/components/dashboard/HitEngine';
 import LogsPanel from '@/components/dashboard/LogsPanel';
+import SiteSettingsPanel from '@/components/dashboard/SiteSettingsPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
-import { Plus, Database, Loader2, LogOut, Code, List } from 'lucide-react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { Plus, Database, Loader2, LogOut, Code, List, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 const AdminDashboard = () => {
   const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
   const { logs, addLog, clearLogs } = useLogs();
   const { proxies } = useProxies();
+  const { settings } = useSiteSettings();
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingApi, setEditingApi] = React.useState<any>(null);
   
@@ -148,10 +151,21 @@ const AdminDashboard = () => {
       <header className="border-b border-primary/30 bg-card/50 backdrop-blur sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 glow-primary">
-              <Database className="w-6 h-6 text-primary" />
-            </div>
-            <h1 className="text-xl font-bold text-primary text-glow">ADMIN PANEL</h1>
+            {settings.logoUrl ? (
+              <img 
+                src={settings.logoUrl} 
+                alt="Logo" 
+                className="w-10 h-10 rounded-lg object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 glow-primary">
+                <Database className="w-6 h-6 text-primary" />
+              </div>
+            )}
+            <h1 className="text-xl font-bold text-primary text-glow">{settings.adminPanelTitle}</h1>
           </div>
           <Button
             variant="outline"
@@ -160,7 +174,7 @@ const AdminDashboard = () => {
             className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:glow-destructive"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            LOGOUT
+            {settings.logoutButtonText}
           </Button>
         </div>
       </header>
@@ -182,6 +196,10 @@ const AdminDashboard = () => {
               <Code className="w-4 h-4 mr-2" />
               Import API (Node.js Fetch)
             </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+              <Settings className="w-4 h-4 mr-2" />
+              Site Settings
+            </TabsTrigger>
           </TabsList>
 
           {/* APIs Tab */}
@@ -192,14 +210,14 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold text-primary text-glow flex items-center gap-2">
                     <Database className="w-5 h-5" />
-                    API List
+                    {settings.apiListTitle}
                   </h2>
                   <Button
                     onClick={() => setFormOpen(true)}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add API
+                    {settings.addApiButtonText}
                   </Button>
                 </div>
 
@@ -210,14 +228,14 @@ const AdminDashboard = () => {
                 ) : apis.length === 0 ? (
                   <div className="text-center py-12 border border-dashed border-primary/30 rounded-lg">
                     <Database className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">No APIs added yet</p>
+                    <p className="text-muted-foreground">{settings.noApisText}</p>
                     <Button
                       onClick={() => setFormOpen(true)}
                       variant="outline"
                       className="mt-4 border-primary/50 text-primary"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Your First API
+                      {settings.addApiButtonText}
                     </Button>
                   </div>
                 ) : (
@@ -247,6 +265,34 @@ const AdminDashboard = () => {
               
               {/* Logs Section */}
               <LogsPanel logs={logs} onClear={clearLogs} />
+            </div>
+          </TabsContent>
+
+          {/* Site Settings Tab */}
+          <TabsContent value="settings">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SiteSettingsPanel />
+              
+              {/* Preview Section */}
+              <div className="space-y-4">
+                <div className="p-4 bg-card/50 border border-accent/30 rounded-lg">
+                  <h3 className="text-accent font-bold mb-2">📱 Preview</h3>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Changes will reflect instantly on the main page after saving.
+                  </p>
+                  <div className="p-3 bg-background/50 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      {settings.logoUrl ? (
+                        <img src={settings.logoUrl} alt="Logo" className="w-6 h-6 object-contain" />
+                      ) : (
+                        <div className="w-6 h-6 bg-primary/20 rounded" />
+                      )}
+                      <span className="font-bold text-primary text-sm">{settings.siteName}</span>
+                    </div>
+                    <p className="text-xs text-warning bg-warning/10 p-2 rounded">{settings.warningText}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

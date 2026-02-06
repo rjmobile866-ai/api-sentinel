@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 interface Api {
   id: string;
@@ -36,6 +37,7 @@ interface QuickHitEngineProps {
 const STORAGE_KEY = 'admin_apis';
 
 const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
+  const { settings } = useSiteSettings();
   const [phone, setPhone] = useState('');
   const [delay, setDelay] = useState(500);
   const [isRunning, setIsRunning] = useState(false);
@@ -232,7 +234,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         <CardTitle className="flex items-center justify-between text-primary text-glow text-sm">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4" />
-            QUICK HIT
+            {settings.quickHitTitle}
           </div>
           <Badge variant="secondary" className="text-[10px] px-1.5">
             {enabledApis.length}/{apis.length} APIs
@@ -244,12 +246,12 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         <div className="space-y-1">
           <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <Phone className="w-3 h-3" />
-            Phone Number
+            {settings.phoneLabel}
           </Label>
           <Input
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-            placeholder="91XXXXXXXXXX"
+            placeholder={settings.phonePlaceholder}
             className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
             maxLength={15}
           />
@@ -308,7 +310,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           <div className="p-2 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
             <AlertCircle className="w-3 h-3 text-warning shrink-0" />
             <p className="text-xs text-warning">
-              <a href="/admin" className="underline font-bold">Admin</a> me APIs add karo.
+              <a href="/admin" className="underline font-bold">Admin</a> {settings.noApisWarning}
             </p>
           </div>
         )}
@@ -321,7 +323,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             className="w-full glow-destructive h-10"
           >
             <X className="w-4 h-4 mr-2" />
-            STOP
+            {settings.stopButtonText}
           </Button>
         ) : (
           <Button
@@ -330,7 +332,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             className="w-full bg-gradient-to-r from-primary via-secondary to-accent text-white font-bold h-10 glow-primary hover:opacity-90"
           >
             <Zap className="w-4 h-4 mr-2" />
-            HIT ({enabledApis.length})
+            {settings.hitButtonText} ({enabledApis.length})
           </Button>
         )}
       </CardContent>
