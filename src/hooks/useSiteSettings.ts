@@ -30,6 +30,9 @@ export interface SiteSettings {
   
   // Security
   adminPassword: string;
+  
+  // Residential Proxy
+  residentialProxyUrl: string;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -51,6 +54,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   noApisText: 'No APIs added yet',
   logoUrl: '',
   adminPassword: '12345',
+  residentialProxyUrl: '',
 };
 
 const STORAGE_KEY = 'site_settings';

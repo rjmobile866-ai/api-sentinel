@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, RotateCcw, Save, Image, Type, AlertTriangle, Lock } from 'lucide-react';
+import { Settings, RotateCcw, Save, Image, Type, AlertTriangle, Lock, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSiteSettings, SiteSettings } from '@/hooks/useSiteSettings';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -306,6 +306,39 @@ const SiteSettingsPanel: React.FC = () => {
                   ⚠️ Yeh password admin login ke liye use hoga
                 </p>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Residential Proxy */}
+          <AccordionItem value="proxy" className="border border-purple-500/30 rounded-lg px-3 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
+            <AccordionTrigger className="py-2 text-sm">
+              <div className="flex items-center gap-2 text-purple-400">
+                <Home className="w-4 h-4" />
+                Residential Proxy
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Proxy URL (with credentials)</Label>
+                <Input
+                  type="password"
+                  value={formData.residentialProxyUrl}
+                  onChange={(e) => handleChange('residentialProxyUrl', e.target.value)}
+                  placeholder="http://user:pass@proxy.example.com:port"
+                  className="bg-input border-purple-500/30 text-sm font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Format: <code className="text-purple-400">http://username:password@host:port</code>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Providers: Bright Data, Oxylabs, Smartproxy, IPRoyal
+                </p>
+              </div>
+              {formData.residentialProxyUrl && (
+                <div className="p-2 bg-purple-500/10 rounded border border-purple-500/30">
+                  <p className="text-xs text-purple-400">✅ Proxy URL configured</p>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
