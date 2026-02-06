@@ -33,25 +33,31 @@ const AdminDashboard = () => {
   };
 
   const handleFormSubmit = async (data: any) => {
-    const apiData = {
-      name: data.name,
-      url: data.url,
-      method: data.method,
-      headers: JSON.parse(data.headers || '{}'),
-      body: JSON.parse(data.body || '{}'),
-      query_params: JSON.parse(data.query_params || '{}'),
-      enabled: data.enabled,
-      proxy_enabled: data.proxy_enabled,
-      force_proxy: data.force_proxy,
-      rotation_enabled: data.rotation_enabled,
-    };
+    try {
+      const apiData = {
+        name: data.name,
+        url: data.url,
+        method: data.method,
+        headers: JSON.parse(data.headers || '{}'),
+        body: JSON.parse(data.body || '{}'),
+        bodyType: 'json' as const,
+        query_params: JSON.parse(data.query_params || '{}'),
+        enabled: data.enabled,
+        proxy_enabled: data.proxy_enabled,
+        force_proxy: data.force_proxy,
+        rotation_enabled: data.rotation_enabled,
+      };
 
-    if (data.id) {
-      await updateApi(data.id, apiData);
-    } else {
-      await addApi(apiData);
+      if (data.id) {
+        await updateApi(data.id, apiData);
+      } else {
+        await addApi(apiData);
+      }
+      setEditingApi(null);
+    } catch (e) {
+      console.error('Failed to save API:', e);
+      // Toast is handled by useApis hook
     }
-    setEditingApi(null);
   };
 
   const handleImportApi = async (apiData: {
