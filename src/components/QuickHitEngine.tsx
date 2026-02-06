@@ -42,6 +42,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [hitCount, setHitCount] = useState(0);
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
+  const [roundCount, setRoundCount] = useState(0);
   const [currentApi, setCurrentApi] = useState<string | null>(null);
   const [apis, setApis] = useState<Api[]>([]);
   const stopRef = React.useRef(false);
@@ -185,27 +186,37 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     setHitCount(0);
     setSuccessCount(0);
     setFailCount(0);
+    setRoundCount(0);
 
-    console.log(`[QUICK HIT] Starting quick hit with ${enabledApis.length} APIs via Edge Function`);
-    toast.info(`Hitting ${enabledApis.length} APIs via server...`);
+    console.log(`[QUICK HIT] Starting continuous hit with ${enabledApis.length} APIs via Edge Function`);
+    toast.info(`🔥 Continuous mode started - ${enabledApis.length} APIs per round`);
 
-    for (const api of enabledApis) {
-      if (stopRef.current) break;
-      setCurrentApi(api.name);
-      await hitApiViaEdgeFunction(api, phone);
-      setHitCount(prev => prev + 1);
+    // Continuous loop - keeps running until stopped
+    let currentRound = 0;
+    while (!stopRef.current) {
+      currentRound++;
+      setRoundCount(currentRound);
       
-      if (delay > 0 && !stopRef.current) {
+      for (const api of enabledApis) {
+        if (stopRef.current) break;
+        setCurrentApi(api.name);
+        await hitApiViaEdgeFunction(api, phone);
+        setHitCount(prev => prev + 1);
+        
+        if (delay > 0 && !stopRef.current) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      // Small pause between rounds
+      if (!stopRef.current && delay > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     setIsRunning(false);
     setCurrentApi(null);
-    
-    if (!stopRef.current) {
-      toast.success('All APIs hit successfully!');
-    }
+    toast.info(`Stopped after ${currentRound} rounds`);
   };
 
   const handleStop = () => {
@@ -264,6 +275,10 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         {/* Stats - Compact Inline */}
         {(hitCount > 0 || isRunning) && (
           <div className="flex items-center justify-center gap-4 p-2 bg-muted/10 rounded-lg">
+            <div className="flex items-center gap-1 px-2 py-1 bg-primary/20 rounded">
+              <RotateCcw className="w-3 h-3 text-primary" />
+              <span className="text-sm font-bold text-primary">R{roundCount}</span>
+            </div>
             <div className="flex items-center gap-1">
               <Activity className="w-3 h-3 text-secondary" />
               <span className="text-sm font-bold text-secondary">{hitCount}</span>
@@ -273,7 +288,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
               <span className="text-sm font-bold text-accent">{successCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <RotateCcw className="w-3 h-3 text-destructive" />
+              <X className="w-3 h-3 text-destructive" />
               <span className="text-sm font-bold text-destructive">{failCount}</span>
             </div>
           </div>
