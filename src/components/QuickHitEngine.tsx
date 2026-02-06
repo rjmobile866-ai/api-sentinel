@@ -4,10 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, AlertCircle, Plus, Trash2, Edit, Save, X } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, Server, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import ApiForm from '@/components/dashboard/ApiForm';
 
 interface Api {
   id: string;
@@ -45,39 +44,25 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [failCount, setFailCount] = useState(0);
   const [currentApi, setCurrentApi] = useState<string | null>(null);
   const [apis, setApis] = useState<Api[]>([]);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingApi, setEditingApi] = useState<any>(null);
   const stopRef = React.useRef(false);
 
-  // Load APIs from localStorage
-  const loadApis = () => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsedApis = JSON.parse(stored) as Api[];
-        setApis(parsedApis);
-      }
-    } catch (e) {
-      console.error('[QUICK HIT] Failed to load APIs:', e);
-    }
-  };
-
-  // Save APIs to localStorage
-  const saveApis = (newApis: Api[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newApis));
-      setApis(newApis);
-      // Dispatch storage event for other tabs/components
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {
-      console.error('[QUICK HIT] Failed to save APIs:', e);
-    }
-  };
-
+  // Load APIs from localStorage (read-only)
   useEffect(() => {
+    const loadApis = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsedApis = JSON.parse(stored) as Api[];
+          setApis(parsedApis);
+        }
+      } catch (e) {
+        console.error('[QUICK HIT] Failed to load APIs:', e);
+      }
+    };
+    
     loadApis();
     
-    // Listen for storage changes
+    // Listen for storage changes (when admin adds new APIs)
     const handleStorageChange = () => loadApis();
     window.addEventListener('storage', handleStorageChange);
     
@@ -86,61 +71,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
   // Get only enabled APIs
   const enabledApis = apis.filter(api => api.enabled);
-
-  // Add new API
-  const handleAddApi = (data: any) => {
-    const newApi: Api = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: data.name,
-      url: data.url,
-      method: data.method,
-      headers: JSON.parse(data.headers || '{}'),
-      body: JSON.parse(data.body || '{}'),
-      query_params: JSON.parse(data.query_params || '{}'),
-      enabled: data.enabled,
-      proxy_enabled: data.proxy_enabled,
-      force_proxy: data.force_proxy,
-      rotation_enabled: data.rotation_enabled,
-    };
-    
-    if (data.id) {
-      // Update existing
-      const updated = apis.map(api => api.id === data.id ? { ...newApi, id: data.id } : api);
-      saveApis(updated);
-      toast.success('API updated!');
-    } else {
-      // Add new
-      saveApis([...apis, newApi]);
-      toast.success('API added!');
-    }
-    setEditingApi(null);
-  };
-
-  // Delete API
-  const handleDeleteApi = (id: string) => {
-    const updated = apis.filter(api => api.id !== id);
-    saveApis(updated);
-    toast.success('API deleted!');
-  };
-
-  // Edit API
-  const handleEditApi = (api: Api) => {
-    setEditingApi({
-      ...api,
-      headers: JSON.stringify(api.headers || {}, null, 2),
-      body: JSON.stringify(api.body || {}, null, 2),
-      query_params: JSON.stringify(api.query_params || {}, null, 2),
-    });
-    setFormOpen(true);
-  };
-
-  // Toggle API enabled
-  const toggleApiEnabled = (id: string) => {
-    const updated = apis.map(api => 
-      api.id === id ? { ...api, enabled: !api.enabled } : api
-    );
-    saveApis(updated);
-  };
 
   const replacePlaceholders = (text: string, phoneNumber: string): string => {
     return text.replace(/\{PHONE\}/gi, phoneNumber);
@@ -164,13 +94,11 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     const startTime = Date.now();
     
     try {
-      // Replace placeholders
       const finalUrl = replacePlaceholders(api.url, phoneNumber);
       const finalHeaders = replacePlaceholdersInObject(api.headers || {}, phoneNumber) as Record<string, string>;
       const finalBody = replacePlaceholdersInObject(api.body || {}, phoneNumber);
       const finalQueryParams = replacePlaceholdersInObject(api.query_params || {}, phoneNumber) as Record<string, string>;
 
-      // Build URL with query params
       let urlWithParams = finalUrl;
       if (Object.keys(finalQueryParams).length > 0) {
         const params = new URLSearchParams(finalQueryParams);
@@ -178,9 +106,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       }
 
       console.log(`[QUICK HIT] Calling Edge Function for: ${api.name}`);
-      console.log(`[QUICK HIT] URL: ${urlWithParams}`);
 
-      // Call via Edge Function
       const { data, error } = await supabase.functions.invoke('hit-api', {
         body: {
           url: urlWithParams,
@@ -250,7 +176,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     }
 
     if (enabledApis.length === 0) {
-      toast.error('Koi API enabled nahi hai! Pehle API add karo.');
+      toast.error('Koi API nahi hai! Pehle Admin Panel me APIs add karo.');
       return;
     }
 
@@ -300,9 +226,9 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="border-primary/50 text-primary">
               <Server className="w-3 h-3 mr-1" />
-              SERVER MODE
+              SERVER
             </Badge>
-            <Badge variant="secondary">{apis.length} APIs</Badge>
+            <Badge variant="secondary">{enabledApis.length}/{apis.length} APIs</Badge>
           </div>
         </CardTitle>
       </CardHeader>
@@ -341,82 +267,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           </div>
         </div>
 
-        {/* API List */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-muted-foreground">Your APIs</Label>
-            <Button
-              size="sm"
-              onClick={() => { setEditingApi(null); setFormOpen(true); }}
-              className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add API
-            </Button>
-          </div>
-          
-          {apis.length === 0 ? (
-            <div className="p-4 bg-muted/10 rounded-lg border border-dashed border-muted/30 text-center">
-              <AlertCircle className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No APIs added yet</p>
-              <Button
-                size="sm"
-                onClick={() => { setEditingApi(null); setFormOpen(true); }}
-                className="mt-2"
-                variant="outline"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Your First API
-              </Button>
-            </div>
-          ) : (
-            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-              {apis.map((api) => (
-                <div
-                  key={api.id}
-                  className={`p-2 rounded-lg border flex items-center justify-between ${
-                    api.enabled 
-                      ? 'bg-primary/5 border-primary/30' 
-                      : 'bg-muted/5 border-muted/20 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <button
-                      onClick={() => toggleApiEnabled(api.id)}
-                      className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                        api.enabled ? 'bg-green-500' : 'bg-muted'
-                      }`}
-                      title={api.enabled ? 'Enabled - Click to disable' : 'Disabled - Click to enable'}
-                    />
-                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                      {api.method}
-                    </Badge>
-                    <span className="text-sm truncate">{api.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleEditApi(api)}
-                      className="h-7 w-7 text-muted-foreground hover:text-primary"
-                    >
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleDeleteApi(api.id)}
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Stats */}
         {(hitCount > 0 || isRunning) && (
           <div className="grid grid-cols-3 gap-2">
@@ -425,9 +275,9 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
               <p className="text-lg font-bold text-primary">{hitCount}</p>
               <p className="text-xs text-muted-foreground">Hits</p>
             </div>
-            <div className="p-2 bg-green-500/10 rounded text-center">
-              <Wifi className="w-4 h-4 mx-auto text-green-500 mb-1" />
-              <p className="text-lg font-bold text-green-500">{successCount}</p>
+            <div className="p-2 bg-primary/10 rounded text-center">
+              <Wifi className="w-4 h-4 mx-auto text-primary mb-1" />
+              <p className="text-lg font-bold text-primary">{successCount}</p>
               <p className="text-xs text-muted-foreground">Success</p>
             </div>
             <div className="p-2 bg-destructive/10 rounded text-center">
@@ -443,6 +293,16 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           <div className="p-2 bg-primary/10 rounded-lg border border-primary/30 animate-pulse">
             <p className="text-xs text-primary text-center">
               🔥 Hitting: <span className="font-bold">{currentApi}</span>
+            </p>
+          </div>
+        )}
+
+        {/* No APIs Warning */}
+        {apis.length === 0 && (
+          <div className="p-3 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
+            <p className="text-xs text-warning">
+              Koi API nahi hai. <a href="/admin" className="underline font-bold">Admin Panel</a> me APIs add karo.
             </p>
           </div>
         )}
@@ -471,17 +331,9 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Add unlimited APIs • All hits via secure server
+          APIs manage karo: <a href="/admin" className="text-primary underline">/admin</a>
         </p>
       </CardContent>
-
-      {/* API Form Dialog */}
-      <ApiForm
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditingApi(null); }}
-        onSubmit={handleAddApi}
-        editData={editingApi}
-      />
     </Card>
   );
 };
