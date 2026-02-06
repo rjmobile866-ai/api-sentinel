@@ -6,15 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, CheckCircle, Code, Zap, Globe, Shield, RotateCcw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Code, Zap, Globe, Shield, RotateCcw, Info } from 'lucide-react';
 
 interface ParsedApi {
   name: string;
   url: string;
   method: string;
   headers: Record<string, string>;
-  body: Record<string, any>;
+  body: Record<string, unknown>;
   query_params: Record<string, string>;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
 }
 
 interface ApiImporterProps {
@@ -23,7 +28,7 @@ interface ApiImporterProps {
     url: string;
     method: string;
     headers: Record<string, string>;
-    body: Record<string, any>;
+    body: Record<string, unknown>;
     query_params: Record<string, string>;
     enabled: boolean;
     proxy_enabled: boolean;
@@ -32,16 +37,9 @@ interface ApiImporterProps {
   }) => void;
 }
 
-// Headers to automatically remove
+// Headers to automatically remove (case-insensitive matching)
 const HEADERS_TO_REMOVE = [
   'user-agent',
-  'sec-ch-ua',
-  'sec-ch-ua-mobile',
-  'sec-ch-ua-platform',
-  'sec-fetch-dest',
-  'sec-fetch-mode',
-  'sec-fetch-site',
-  'sec-fetch-user',
   'cookie',
   'accept-encoding',
   'content-length',
@@ -56,44 +54,124 @@ const HEADERS_TO_REMOVE = [
   'origin',
 ];
 
-// Headers to keep by default
-const HEADERS_TO_KEEP = [
-  'content-type',
-  'accept',
-  'x-requested-with',
-  'authorization',
-  'x-api-key',
-  'x-auth-token',
-];
+// sec-* headers pattern - all headers starting with sec- are removed
+const SEC_HEADER_PATTERN = /^sec-/i;
+
+// X-Requested-With values to replace with XMLHttpRequest
+const INVALID_XRW_VALUES = ['mark.via.gp', 'mark.via', 'via.browser'];
 
 const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
   const [rawCode, setRawCode] = useState('');
   const [parsedApi, setParsedApi] = useState<ParsedApi | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [apiName, setApiName] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [forceProxy, setForceProxy] = useState(true);
   const [rotationEnabled, setRotationEnabled] = useState(false);
 
-  const cleanHeaders = (headers: Record<string, string>): Record<string, string> => {
-    const cleaned: Record<string, string> = {};
+  // Normalize header key to lowercase for comparison
+  const normalizeHeaderKey = (key: string): string => key.toLowerCase().trim();
+
+  // Check if header should be removed
+  const shouldRemoveHeader = (key: string): boolean => {
+    const normalizedKey = normalizeHeaderKey(key);
     
+    // Check sec-* pattern
+    if (SEC_HEADER_PATTERN.test(normalizedKey)) {
+      return true;
+    }
+    
+    // Check against removal list
+    return HEADERS_TO_REMOVE.includes(normalizedKey);
+  };
+
+  // Clean and normalize headers
+  const cleanHeaders = (
+    headers: Record<string, string>, 
+    method: string, 
+    hasJsonBody: boolean
+  ): Record<string, string> => {
+    const normalizedHeaders: Map<string, { originalKey: string; value: string }> = new Map();
+    
+    // First pass: normalize and deduplicate headers (last value wins)
     for (const [key, value] of Object.entries(headers)) {
-      const lowerKey = key.toLowerCase();
+      const normalizedKey = normalizeHeaderKey(key);
       
       // Skip headers that should be removed
-      if (HEADERS_TO_REMOVE.some(h => lowerKey === h || lowerKey.startsWith('sec-'))) {
+      if (shouldRemoveHeader(key)) {
         continue;
       }
       
-      // Keep important headers and any custom headers
-      cleaned[key] = value;
+      // Handle X-Requested-With normalization
+      if (normalizedKey === 'x-requested-with') {
+        const lowerValue = value.toLowerCase();
+        if (INVALID_XRW_VALUES.some(v => lowerValue.includes(v))) {
+          normalizedHeaders.set(normalizedKey, { originalKey: 'X-Requested-With', value: 'XMLHttpRequest' });
+          continue;
+        }
+      }
+      
+      // Store with normalized key, keeping last value
+      normalizedHeaders.set(normalizedKey, { originalKey: key, value });
+    }
+    
+    // Build final headers object
+    const cleaned: Record<string, string> = {};
+    
+    for (const [normalizedKey, { originalKey, value }] of normalizedHeaders) {
+      // Use proper casing for common headers
+      const properKey = getProperHeaderCasing(originalKey);
+      cleaned[properKey] = value;
+    }
+    
+    // Auto-add Content-Type for POST/PUT/PATCH with JSON body
+    if (['POST', 'PUT', 'PATCH'].includes(method) && hasJsonBody) {
+      const hasContentType = normalizedHeaders.has('content-type');
+      if (!hasContentType) {
+        cleaned['Content-Type'] = 'application/json';
+      }
+    }
+    
+    // Auto-add Accept header for JSON body requests
+    if (hasJsonBody) {
+      const hasAccept = normalizedHeaders.has('accept');
+      if (!hasAccept) {
+        cleaned['Accept'] = 'application/json';
+      }
+    }
+    
+    // Remove Content-Type for GET requests (shouldn't have body)
+    if (method === 'GET') {
+      delete cleaned['Content-Type'];
+      // Also check lowercase version
+      for (const key of Object.keys(cleaned)) {
+        if (normalizeHeaderKey(key) === 'content-type') {
+          delete cleaned[key];
+        }
+      }
     }
     
     return cleaned;
   };
 
+  // Get proper casing for common headers
+  const getProperHeaderCasing = (header: string): string => {
+    const casingMap: Record<string, string> = {
+      'content-type': 'Content-Type',
+      'accept': 'Accept',
+      'authorization': 'Authorization',
+      'x-requested-with': 'X-Requested-With',
+      'x-api-key': 'X-API-Key',
+      'x-auth-token': 'X-Auth-Token',
+    };
+    
+    const normalized = normalizeHeaderKey(header);
+    return casingMap[normalized] || header;
+  };
+
+  // Extract query params from URL
   const extractQueryParams = (url: string): { cleanUrl: string; params: Record<string, string> } => {
     try {
       const urlObj = new URL(url);
@@ -101,7 +179,6 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
       urlObj.searchParams.forEach((value, key) => {
         params[key] = value;
       });
-      // Return URL without query string
       const cleanUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
       return { cleanUrl, params };
     } catch {
@@ -109,20 +186,180 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     }
   };
 
+  // Generate meaningful API name
   const generateApiName = (url: string, method: string): string => {
     try {
       const urlObj = new URL(url);
       const pathParts = urlObj.pathname.split('/').filter(Boolean);
-      const lastPath = pathParts[pathParts.length - 1] || urlObj.hostname;
-      return `${method} ${lastPath}`.substring(0, 50);
+      
+      // Find meaningful path segments (not just numbers/IDs)
+      const meaningfulParts = pathParts.filter(part => {
+        // Skip pure numeric parts or UUID-like strings
+        if (/^\d+$/.test(part)) return false;
+        if (/^[a-f0-9-]{32,}$/i.test(part)) return false;
+        return true;
+      });
+      
+      // Take last 2 meaningful parts for better context
+      const nameParts = meaningfulParts.slice(-2);
+      
+      if (nameParts.length > 0) {
+        // Convert to readable format: api-login-send-otp → login send otp
+        const readableName = nameParts
+          .map(p => p.replace(/[-_]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2'))
+          .join(' ')
+          .toLowerCase();
+        return `${method} ${readableName}`.substring(0, 50);
+      }
+      
+      // Fallback to hostname
+      const hostParts = urlObj.hostname.split('.');
+      const domain = hostParts.length > 1 ? hostParts[hostParts.length - 2] : hostParts[0];
+      return `${method} ${domain}`.substring(0, 50);
     } catch {
       return `${method} API`;
     }
   };
 
+  // Check if body is JSON
+  const isJsonBody = (body: unknown): boolean => {
+    if (body === null || body === undefined) return false;
+    if (typeof body === 'object' && Object.keys(body as object).length > 0) return true;
+    return false;
+  };
+
+  // Validate URL
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Validate parsed API before adding
+  const validateApi = (api: ParsedApi, customName: string): ValidationResult => {
+    const errors: string[] = [];
+    
+    // Validate URL
+    if (!api.url || !isValidUrl(api.url)) {
+      errors.push('Invalid URL format. Please check the URL is complete and valid.');
+    }
+    
+    // Validate method
+    const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+    if (!api.method || !validMethods.includes(api.method)) {
+      errors.push('Invalid HTTP method. Supported: GET, POST, PUT, DELETE, PATCH');
+    }
+    
+    // Validate API name
+    const finalName = customName || api.name;
+    if (!finalName || finalName.trim().length < 2) {
+      errors.push('API name is required (minimum 2 characters)');
+    }
+    
+    // Validate body JSON (if present)
+    if (['POST', 'PUT', 'PATCH'].includes(api.method) && Object.keys(api.body).length > 0) {
+      try {
+        JSON.stringify(api.body);
+      } catch {
+        errors.push('Body contains invalid JSON data');
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  };
+
+  // Parse body from code
+  const parseBody = (code: string): Record<string, unknown> => {
+    let body: Record<string, unknown> = {};
+    
+    // Pattern 1: body: JSON.stringify({...})
+    const jsonStringifyMatch = code.match(/body\s*:\s*JSON\.stringify\s*\(\s*(\{[\s\S]*?\})\s*\)/);
+    if (jsonStringifyMatch) {
+      try {
+        let bodyStr = jsonStringifyMatch[1];
+        bodyStr = bodyStr.replace(/'/g, '"');
+        bodyStr = bodyStr.replace(/,\s*}/g, '}');
+        bodyStr = bodyStr.replace(/,\s*]/g, ']');
+        bodyStr = bodyStr.replace(/\n\s*/g, ' ');
+        // Handle unquoted keys
+        bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+        body = JSON.parse(bodyStr);
+        return body;
+      } catch {
+        // Continue to other patterns
+      }
+    }
+    
+    // Pattern 2: body: data (where data is a variable containing object)
+    const bodyVarMatch = code.match(/body\s*:\s*([a-zA-Z_]\w*)\s*[,}]/);
+    if (bodyVarMatch) {
+      const varName = bodyVarMatch[1];
+      // Look for variable definition
+      const varDefMatch = code.match(new RegExp(`(?:const|let|var)\\s+${varName}\\s*=\\s*(\\{[\\s\\S]*?\\})\\s*[;\\n]`));
+      if (varDefMatch) {
+        try {
+          let bodyStr = varDefMatch[1];
+          bodyStr = bodyStr.replace(/'/g, '"');
+          bodyStr = bodyStr.replace(/,\s*}/g, '}');
+          bodyStr = bodyStr.replace(/\n\s*/g, ' ');
+          bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+          body = JSON.parse(bodyStr);
+          return body;
+        } catch {
+          // Continue
+        }
+      }
+    }
+    
+    // Pattern 3: body: {...} (direct object)
+    const directBodyMatch = code.match(/body\s*:\s*(\{[\s\S]*?\})\s*(?:,|\})/);
+    if (directBodyMatch) {
+      try {
+        let bodyStr = directBodyMatch[1];
+        bodyStr = bodyStr.replace(/'/g, '"');
+        bodyStr = bodyStr.replace(/,\s*}/g, '}');
+        bodyStr = bodyStr.replace(/\n\s*/g, ' ');
+        bodyStr = bodyStr.replace(/(\{|,)\s*([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+        body = JSON.parse(bodyStr);
+        return body;
+      } catch {
+        // Try extracting key-value pairs
+        const bodyLines = directBodyMatch[1].match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/g);
+        if (bodyLines) {
+          bodyLines.forEach(line => {
+            const parts = line.match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,}]+)["'`]?/);
+            if (parts) {
+              body[parts[1]] = parts[2].trim();
+            }
+          });
+        }
+      }
+    }
+    
+    // Pattern 4: body: "json string"
+    const stringBodyMatch = code.match(/body\s*:\s*["'`]([\s\S]*?)["'`]\s*[,}]/);
+    if (stringBodyMatch && Object.keys(body).length === 0) {
+      try {
+        body = JSON.parse(stringBodyMatch[1]);
+      } catch {
+        // Not valid JSON string
+      }
+    }
+    
+    return body;
+  };
+
+  // Main parse function
   const parseNodeFetchCode = (code: string) => {
     setError(null);
     setParsedApi(null);
+    setValidationErrors([]);
 
     if (!code.trim()) {
       setError('Please paste Node.js fetch code');
@@ -137,7 +374,13 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         return;
       }
 
-      let fullUrl = urlMatch[1];
+      const fullUrl = urlMatch[1];
+      
+      // Validate URL early
+      if (!isValidUrl(fullUrl)) {
+        setError('Invalid URL detected. Please check the URL format.');
+        return;
+      }
       
       // Extract query params from URL
       const { cleanUrl, params: queryParams } = extractQueryParams(fullUrl);
@@ -151,16 +394,14 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
       const headersMatch = code.match(/headers\s*:\s*(\{[\s\S]*?\})\s*(?:,|\})/);
       if (headersMatch) {
         try {
-          // Clean up the headers string for parsing
           let headersStr = headersMatch[1];
-          // Replace single quotes with double quotes for JSON parsing
           headersStr = headersStr.replace(/'/g, '"');
-          // Remove trailing commas
           headersStr = headersStr.replace(/,\s*}/g, '}');
-          // Remove newlines and extra spaces
           headersStr = headersStr.replace(/\n\s*/g, ' ');
+          // Handle unquoted keys
+          headersStr = headersStr.replace(/(\{|,)\s*([a-zA-Z_-]+)\s*:/g, '$1"$2":');
           headers = JSON.parse(headersStr);
-        } catch (e) {
+        } catch {
           // Try alternative parsing for complex headers
           const headerLines = headersMatch[1].match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]([^"'`]*)["'`]/g);
           if (headerLines) {
@@ -174,45 +415,14 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         }
       }
 
-      // Clean headers
-      const cleanedHeaders = cleanHeaders(headers);
+      // Parse body
+      const body = parseBody(code);
+      const hasJsonBody = isJsonBody(body);
 
-      // Extract body
-      let body: Record<string, any> = {};
-      const bodyMatch = code.match(/body\s*:\s*(?:JSON\.stringify\s*\()?\s*(\{[\s\S]*?\})\s*\)?/);
-      if (bodyMatch) {
-        try {
-          let bodyStr = bodyMatch[1];
-          bodyStr = bodyStr.replace(/'/g, '"');
-          bodyStr = bodyStr.replace(/,\s*}/g, '}');
-          bodyStr = bodyStr.replace(/\n\s*/g, ' ');
-          body = JSON.parse(bodyStr);
-        } catch (e) {
-          // If JSON parse fails, try to extract key-value pairs
-          const bodyLines = bodyMatch[1].match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,\}]+)["'`]?/g);
-          if (bodyLines) {
-            bodyLines.forEach(line => {
-              const parts = line.match(/["'`]([^"'`]+)["'`]\s*:\s*["'`]?([^"'`,\}]+)["'`]?/);
-              if (parts) {
-                body[parts[1]] = parts[2].trim();
-              }
-            });
-          }
-        }
-      }
+      // Clean headers with context
+      const cleanedHeaders = cleanHeaders(headers, method, hasJsonBody);
 
-      // Also check for string body (like raw JSON string)
-      if (Object.keys(body).length === 0) {
-        const rawBodyMatch = code.match(/body\s*:\s*["'`]([\s\S]*?)["'`]/);
-        if (rawBodyMatch) {
-          try {
-            body = JSON.parse(rawBodyMatch[1]);
-          } catch {
-            // Keep empty if can't parse
-          }
-        }
-      }
-
+      // Generate meaningful name
       const generatedName = generateApiName(cleanUrl, method);
       setApiName(generatedName);
 
@@ -222,14 +432,16 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
         setForceProxy(true);
       }
 
-      setParsedApi({
+      const parsed: ParsedApi = {
         name: generatedName,
         url: cleanUrl,
         method,
         headers: cleanedHeaders,
         body,
         query_params: queryParams,
-      });
+      };
+
+      setParsedApi(parsed);
 
     } catch (e) {
       setError('Failed to parse code. Please make sure it\'s valid Node.js fetch code from Reqable.');
@@ -237,8 +449,18 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     }
   };
 
+  // Handle confirm and add
   const handleConfirmAdd = () => {
     if (!parsedApi) return;
+
+    // Validate before adding
+    const validation = validateApi(parsedApi, apiName);
+    if (!validation.valid) {
+      setValidationErrors(validation.errors);
+      return;
+    }
+
+    setValidationErrors([]);
 
     onApiAdd({
       name: apiName || parsedApi.name,
@@ -263,12 +485,48 @@ const ApiImporter: React.FC<ApiImporterProps> = ({ onApiAdd }) => {
     setRotationEnabled(false);
   };
 
+  // Get error message for status codes
+  const getStatusErrorHint = (statusCode: number): string => {
+    switch (statusCode) {
+      case 400:
+        return '💡 Hint: Body / Content-Type mismatch - check if body format matches Content-Type header';
+      case 401:
+        return '💡 Hint: Authorization / session required - add valid auth token or login first';
+      case 403:
+        return '💡 Hint: API blocked by origin / security - may need proxy or different approach';
+      case 404:
+        return '💡 Hint: Endpoint not found - verify the URL path is correct';
+      case 429:
+        return '💡 Hint: Rate limited - too many requests, add delay between hits';
+      case 500:
+        return '💡 Hint: Server error - check if request body/headers are correct';
+      default:
+        return '';
+    }
+  };
+
   const methodColors: Record<string, string> = {
     GET: 'bg-success/20 text-success border-success/30',
     POST: 'bg-secondary/20 text-secondary border-secondary/30',
     PUT: 'bg-warning/20 text-warning border-warning/30',
     DELETE: 'bg-destructive/20 text-destructive border-destructive/30',
     PATCH: 'bg-accent/20 text-accent border-accent/30',
+  };
+
+  // Build preview of what will be sent
+  const buildRequestPreview = () => {
+    if (!parsedApi) return null;
+
+    const preview = {
+      method: parsedApi.method,
+      url: parsedApi.url + (Object.keys(parsedApi.query_params).length > 0 
+        ? '?' + new URLSearchParams(parsedApi.query_params).toString() 
+        : ''),
+      headers: parsedApi.headers,
+      ...(Object.keys(parsedApi.body).length > 0 && { body: parsedApi.body }),
+    };
+
+    return preview;
   };
 
   return (
@@ -292,7 +550,7 @@ fetch("https://api.example.com/endpoint", {
     "Authorization": "Bearer token"
   },
   body: JSON.stringify({
-    "key": "value"
+    "phone": "{PHONE}"
   })
 })`}
             value={rawCode}
@@ -327,6 +585,21 @@ fetch("https://api.example.com/endpoint", {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Validation Errors */}
+            {validationErrors.length > 0 && (
+              <div className="space-y-2 p-3 rounded bg-destructive/10 border border-destructive/30">
+                <div className="flex items-center gap-2 text-destructive font-medium text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  Validation Failed
+                </div>
+                <ul className="list-disc list-inside text-xs text-destructive space-y-1">
+                  {validationErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* API Name */}
             <div className="space-y-2">
               <Label className="text-muted-foreground">API Name</Label>
@@ -353,8 +626,9 @@ fetch("https://api.example.com/endpoint", {
 
             {/* Headers */}
             <div className="space-y-2">
-              <Label className="text-muted-foreground">
+              <Label className="text-muted-foreground flex items-center gap-2">
                 Headers ({Object.keys(parsedApi.headers).length} kept)
+                <Info className="w-3 h-3 text-muted-foreground/60" />
               </Label>
               <div className="bg-muted/30 p-2 rounded border border-muted/50 max-h-32 overflow-auto">
                 {Object.keys(parsedApi.headers).length > 0 ? (
@@ -362,7 +636,7 @@ fetch("https://api.example.com/endpoint", {
                     {JSON.stringify(parsedApi.headers, null, 2)}
                   </pre>
                 ) : (
-                  <span className="text-xs text-muted-foreground">No headers</span>
+                  <span className="text-xs text-muted-foreground">No headers (defaults will be used)</span>
                 )}
               </div>
             </div>
@@ -370,7 +644,7 @@ fetch("https://api.example.com/endpoint", {
             {/* Body */}
             {Object.keys(parsedApi.body).length > 0 && (
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Body</Label>
+                <Label className="text-muted-foreground">Body (JSON)</Label>
                 <div className="bg-muted/30 p-2 rounded border border-muted/50 max-h-32 overflow-auto">
                   <pre className="text-xs font-mono whitespace-pre-wrap">
                     {JSON.stringify(parsedApi.body, null, 2)}
@@ -390,6 +664,18 @@ fetch("https://api.example.com/endpoint", {
                 </div>
               </div>
             )}
+
+            {/* Request Preview - What will actually be sent */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground flex items-center gap-2">
+                📤 Request Preview (Exact Payload)
+              </Label>
+              <div className="bg-background/50 p-2 rounded border border-primary/30 max-h-40 overflow-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap text-primary/80">
+                  {JSON.stringify(buildRequestPreview(), null, 2)}
+                </pre>
+              </div>
+            </div>
 
             {/* Toggles */}
             <div className="grid grid-cols-2 gap-2">
@@ -428,6 +714,14 @@ fetch("https://api.example.com/endpoint", {
               <div className="flex items-start gap-2 p-2 rounded bg-warning/10 border border-warning/30 text-warning text-xs">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>HTTP URL detected - Proxy auto-enabled for server-side execution</span>
+              </div>
+            )}
+
+            {/* Info about auto-added headers */}
+            {parsedApi.method !== 'GET' && Object.keys(parsedApi.body).length > 0 && (
+              <div className="flex items-start gap-2 p-2 rounded bg-secondary/10 border border-secondary/30 text-secondary text-xs">
+                <Info className="w-4 h-4 shrink-0" />
+                <span>Content-Type & Accept headers auto-added for JSON body</span>
               </div>
             )}
 
