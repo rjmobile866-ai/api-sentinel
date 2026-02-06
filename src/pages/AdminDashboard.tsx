@@ -147,99 +147,104 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-matrix pointer-events-none" />
       
-      {/* Custom Header */}
+      {/* Custom Header - Mobile Optimized */}
       <header className="border-b border-primary/30 bg-card/50 backdrop-blur sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="container mx-auto px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
             {settings.logoUrl ? (
               <img 
                 src={settings.logoUrl} 
                 alt="Logo" 
-                className="w-10 h-10 rounded-lg object-contain"
+                className="w-8 h-8 rounded-lg object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : (
-              <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 glow-primary">
-                <Database className="w-6 h-6 text-primary" />
+              <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/30 glow-primary">
+                <Database className="w-5 h-5 text-primary" />
               </div>
             )}
-            <h1 className="text-xl font-bold text-primary text-glow">{settings.adminPanelTitle}</h1>
+            <h1 className="text-base sm:text-xl font-bold text-primary text-glow truncate">{settings.adminPanelTitle}</h1>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:glow-destructive"
+            className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:glow-destructive text-xs px-2 py-1"
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            {settings.logoutButtonText}
+            <LogOut className="w-3 h-3 sm:mr-1" />
+            <span className="hidden sm:inline">{settings.logoutButtonText}</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">{/* removed relative */}
+      <main className="container mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-3 sm:space-y-6">
         <DisclaimerBanner />
 
         {/* Hit Engine */}
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />
 
-        {/* Tabs for API Management */}
-        <Tabs defaultValue="apis" className="space-y-4">
-          <TabsList className="bg-muted/30 border border-primary/30">
-            <TabsTrigger value="apis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <List className="w-4 h-4 mr-2" />
-              APIs ({apis.length})
+        {/* Tabs for API Management - Mobile Scrollable */}
+        <Tabs defaultValue="apis" className="space-y-3 sm:space-y-4">
+          <TabsList className="bg-muted/30 border border-primary/30 w-full flex overflow-x-auto">
+            <TabsTrigger value="apis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
+              <List className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">APIs</span> ({apis.length})
             </TabsTrigger>
-            <TabsTrigger value="import" className="data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
-              <Code className="w-4 h-4 mr-2" />
-              Import API (Node.js Fetch)
+            <TabsTrigger value="import" className="data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Import</span>
+              <span className="sm:hidden">Import</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
-              <Settings className="w-4 h-4 mr-2" />
-              Site Settings
+            <TabsTrigger value="settings" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Settings</span>
+              <span className="sm:hidden">⚙️</span>
             </TabsTrigger>
           </TabsList>
 
           {/* APIs Tab */}
           <TabsContent value="apis">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
               {/* APIs Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-primary text-glow flex items-center gap-2">
-                    <Database className="w-5 h-5" />
-                    {settings.apiListTitle}
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-base sm:text-xl font-bold text-primary text-glow flex items-center gap-2">
+                    <Database className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="truncate">{settings.apiListTitle}</span>
                   </h2>
                   <Button
                     onClick={() => setFormOpen(true)}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
+                    size="sm"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary text-xs sm:text-sm px-2 sm:px-3"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {settings.addApiButtonText}
+                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                    <span className="hidden sm:inline">{settings.addApiButtonText}</span>
+                    <span className="sm:hidden">Add</span>
                   </Button>
                 </div>
 
                 {apisLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <div className="flex items-center justify-center py-8 sm:py-12">
+                    <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary animate-spin" />
                   </div>
                 ) : apis.length === 0 ? (
-                  <div className="text-center py-12 border border-dashed border-primary/30 rounded-lg">
-                    <Database className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">{settings.noApisText}</p>
+                  <div className="text-center py-8 sm:py-12 border border-dashed border-primary/30 rounded-lg">
+                    <Database className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-2 sm:mb-3" />
+                    <p className="text-muted-foreground text-sm">{settings.noApisText}</p>
                     <Button
                       onClick={() => setFormOpen(true)}
                       variant="outline"
-                      className="mt-4 border-primary/50 text-primary"
+                      size="sm"
+                      className="mt-3 sm:mt-4 border-primary/50 text-primary text-xs sm:text-sm"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                       {settings.addApiButtonText}
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid gap-2 sm:gap-4">
                     {apis.map((api) => (
                       <ApiCard
                         key={api.id}
@@ -260,7 +265,7 @@ const AdminDashboard = () => {
 
           {/* Import API Tab */}
           <TabsContent value="import">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
               <ApiImporter onApiAdd={handleImportApi} />
               
               {/* Logs Section */}
@@ -270,24 +275,24 @@ const AdminDashboard = () => {
 
           {/* Site Settings Tab */}
           <TabsContent value="settings">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
               <SiteSettingsPanel />
               
               {/* Preview Section */}
-              <div className="space-y-4">
-                <div className="p-4 bg-card/50 border border-accent/30 rounded-lg">
-                  <h3 className="text-accent font-bold mb-2">📱 Preview</h3>
-                  <p className="text-xs text-muted-foreground mb-3">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 bg-card/50 border border-accent/30 rounded-lg">
+                  <h3 className="text-accent font-bold mb-2 text-sm sm:text-base">📱 Preview</h3>
+                  <p className="text-xs text-muted-foreground mb-2 sm:mb-3">
                     Changes will reflect instantly on the main page after saving.
                   </p>
-                  <div className="p-3 bg-background/50 rounded-lg border border-primary/20">
+                  <div className="p-2 sm:p-3 bg-background/50 rounded-lg border border-primary/20">
                     <div className="flex items-center gap-2 mb-2">
                       {settings.logoUrl ? (
-                        <img src={settings.logoUrl} alt="Logo" className="w-6 h-6 object-contain" />
+                        <img src={settings.logoUrl} alt="Logo" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                       ) : (
-                        <div className="w-6 h-6 bg-primary/20 rounded" />
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary/20 rounded" />
                       )}
-                      <span className="font-bold text-primary text-sm">{settings.siteName}</span>
+                      <span className="font-bold text-primary text-xs sm:text-sm">{settings.siteName}</span>
                     </div>
                     <p className="text-xs text-warning bg-warning/10 p-2 rounded">{settings.warningText}</p>
                   </div>
