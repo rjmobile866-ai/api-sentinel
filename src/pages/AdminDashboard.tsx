@@ -13,6 +13,7 @@ import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
 import { Plus, Database, Loader2, LogOut, Code, List } from 'lucide-react';
+import { toast } from 'sonner';
 
 const AdminDashboard = () => {
   const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
@@ -33,15 +34,63 @@ const AdminDashboard = () => {
   };
 
   const handleFormSubmit = async (data: any) => {
+    const safeJsonParse = <T,>(value: string | undefined, fallback: T): T => {
+      try {
+        if (!value || !value.trim()) return fallback;
+        return JSON.parse(value) as T;
+      } catch {
+        return fallback;
+      }
+    };
+
+    const parseFormUrlEncoded = (raw: string): Record<string, string> => {
+      // Supports: "a=1&b=2"; keeps "{PHONE}" as-is.
+      const params = new URLSearchParams(raw);
+      const out: Record<string, string> = {};
+      for (const [k, v] of params.entries()) out[k] = v;
+      return out;
+    };
+
     try {
+      const headers = safeJsonParse<Record<string, string>>(data.headers, {});
+      const contentTypeKey = Object.keys(headers).find(k => k.toLowerCase() === 'content-type');
+      const contentType = contentTypeKey ? String(headers[contentTypeKey] || '') : '';
+
+      const rawBody = String(data.body ?? '').trim();
+
+      // Body parsing rules (manual form)
+      // - If Content-Type is x-www-form-urlencoded, accept either JSON object string or querystring and store as object.
+      // - Otherwise default to JSON.
+      const isFormUrlEncoded = /application\/x-www-form-urlencoded/i.test(contentType);
+
+      let body: Record<string, unknown> = {};
+      let bodyType: 'json' | 'form-urlencoded' | 'multipart' | 'text' | 'none' = 'json';
+
+      if (!rawBody || rawBody === '{}') {
+        body = {};
+        bodyType = 'none';
+      } else if (isFormUrlEncoded) {
+        const jsonObj = safeJsonParse<Record<string, unknown>>(rawBody, {});
+        if (Object.keys(jsonObj).length > 0) {
+          body = jsonObj;
+        } else {
+          body = parseFormUrlEncoded(rawBody);
+        }
+        bodyType = 'form-urlencoded';
+      } else {
+        // JSON body path
+        body = safeJsonParse<Record<string, unknown>>(rawBody, {});
+        bodyType = 'json';
+      }
+
       const apiData = {
         name: data.name,
         url: data.url,
         method: data.method,
-        headers: JSON.parse(data.headers || '{}'),
-        body: JSON.parse(data.body || '{}'),
-        bodyType: 'json' as const,
-        query_params: JSON.parse(data.query_params || '{}'),
+        headers,
+        body,
+        bodyType,
+        query_params: safeJsonParse<Record<string, string>>(data.query_params, {}),
         enabled: data.enabled,
         proxy_enabled: data.proxy_enabled,
         force_proxy: data.force_proxy,
@@ -56,7 +105,7 @@ const AdminDashboard = () => {
       setEditingApi(null);
     } catch (e) {
       console.error('Failed to save API:', e);
-      // Toast is handled by useApis hook
+      toast.error('API add failed — please recheck Headers/Body format.');
     }
   };
 
