@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Shield, Zap } from 'lucide-react';
 import QuickHitEngine from '@/components/QuickHitEngine';
 import LogsPanel from '@/components/dashboard/LogsPanel';
 import { useLogs } from '@/hooks/useLogs';
@@ -11,38 +11,46 @@ const HomePage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background scanline">
+    <div className="min-h-screen max-h-screen overflow-hidden bg-background flex flex-col">
+      {/* Background Effects */}
       <div className="absolute inset-0 gradient-matrix pointer-events-none" />
+      <div className="absolute inset-0 scanline pointer-events-none" />
       
       {/* Header */}
-      <header className="border-b border-primary/30 bg-card/50 backdrop-blur sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary text-glow">API TESTER</h1>
+      <header className="border-b border-primary/40 bg-card/80 backdrop-blur-lg sticky top-0 z-50 shrink-0">
+        <div className="px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center glow-primary">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-xl font-bold gradient-text tracking-tight">RIO METH</h1>
+          </div>
           <Button
             onClick={() => navigate('/admin')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary font-bold"
+            size="sm"
+            className="bg-primary/20 border border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground glow-primary text-xs px-3"
           >
-            🔐 ADMIN PANEL
+            <Shield className="w-3 h-3 mr-1" />
+            ADMIN
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Warning Banner */}
-        <div className="w-full p-3 border border-warning/50 bg-warning/10 rounded-lg flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
-          <p className="text-sm text-warning">
-            ⚠️ Yeh tool sirf authorized testing aur educational purpose ke liye hai.
+      {/* Main Content - Scrollable */}
+      <main className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        {/* Warning Banner - Compact */}
+        <div className="w-full p-2 border border-warning/40 bg-warning/10 rounded-lg flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+          <p className="text-xs text-warning">
+            ⚠️ Sirf authorized testing aur educational purpose ke liye.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quick Hit Engine */}
-          <QuickHitEngine onLogCreate={addLog} />
+        {/* Logs Panel - At Top */}
+        <LogsPanel logs={logs} onClear={clearLogs} />
 
-          {/* Logs */}
-          <LogsPanel logs={logs} onClear={clearLogs} />
-        </div>
+        {/* Quick Hit Engine */}
+        <QuickHitEngine onLogCreate={addLog} />
       </main>
     </div>
   );
