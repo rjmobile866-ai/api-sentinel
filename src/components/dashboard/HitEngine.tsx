@@ -21,6 +21,7 @@ interface Api {
   proxy_enabled: boolean;
   force_proxy: boolean;
   rotation_enabled: boolean;
+  residential_proxy_enabled?: boolean;
 }
 
 interface HitEngineProps {
@@ -116,6 +117,7 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
           body,
           bodyType: api.bodyType || 'json',
           useProxy,
+          useResidentialProxy: api.residential_proxy_enabled || false,
         },
       });
 
