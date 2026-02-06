@@ -5,6 +5,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Browser-like headers to bypass basic protections
+const browserHeaders = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+  'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'cross-site',
+};
+
 interface HitApiRequest {
   url: string;
   method: string;
@@ -31,42 +47,50 @@ serve(async (req) => {
 
     console.log(`[hit-api] Hitting: ${method} ${url}`);
 
+    // Extract origin/referer from target URL
+    let origin = '';
+    try {
+      const urlObj = new URL(url);
+      origin = urlObj.origin;
+    } catch {
+      origin = '';
+    }
+
+    // Merge browser headers with custom headers (custom headers take priority)
+    const finalHeaders: Record<string, string> = {
+      ...browserHeaders,
+      ...(origin && { 'Origin': origin, 'Referer': origin + '/' }),
+      ...headers,
+    };
+
     const fetchOptions: RequestInit = {
       method: method.toUpperCase(),
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
+      headers: finalHeaders,
     };
 
     // Only add body for methods that support it
     if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && body) {
       if (bodyType === 'form-urlencoded') {
-        // Convert object to URL-encoded string
         fetchOptions.body = new URLSearchParams(body as Record<string, string>).toString();
-        // Override Content-Type for form-encoded
         fetchOptions.headers = {
-          ...headers,
+          ...finalHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
         };
       } else if (bodyType === 'multipart') {
-        // For multipart, don't set Content-Type (browser/runtime will set with boundary)
         fetchOptions.body = JSON.stringify(body);
-        const headersCopy = { ...headers };
+        const headersCopy = { ...finalHeaders };
         delete headersCopy['Content-Type'];
         fetchOptions.headers = headersCopy;
       } else if (bodyType === 'text') {
-        // Plain text body
         fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
-        const headersCopy = { ...headers };
+        const headersCopy = { ...finalHeaders };
         delete headersCopy['Content-Type'];
         fetchOptions.headers = headersCopy;
       } else {
-        // Default to JSON
         fetchOptions.body = JSON.stringify(body);
         fetchOptions.headers = {
+          ...finalHeaders,
           'Content-Type': 'application/json',
-          ...headers,
         };
       }
     }
@@ -92,7 +116,7 @@ serve(async (req) => {
         success: response.ok,
         status_code: statusCode,
         response_time: responseTime,
-        response_text: responseText.substring(0, 1000), // Limit response size
+        response_text: responseText.substring(0, 1000),
       }),
       { 
         status: 200, 
