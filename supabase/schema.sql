@@ -1,23 +1,42 @@
 -- =============================================
--- COMPLETE SUPABASE SCHEMA FOR API TESTER APP
+-- 🚀 COMPLETE SUPABASE SCHEMA - ONE-CLICK SETUP
 -- =============================================
--- Run this SQL in your Supabase SQL Editor
--- Make sure to run it in order (tables first, then policies, then functions)
-
--- =============================================
--- 1. CREATE TABLES
+-- Sirf yeh ek file Supabase SQL Editor me run karo
+-- Sab automatic ho jayega - tables, RLS, functions, triggers
 -- =============================================
 
--- Profiles Table (for user data)
-CREATE TABLE IF NOT EXISTS public.profiles (
+-- =============================================
+-- STEP 1: CLEANUP (Agar pehle se kuch hai toh)
+-- =============================================
+
+-- Drop existing triggers
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS update_apis_updated_at ON public.apis;
+
+-- Drop existing functions
+DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column CASCADE;
+
+-- Drop existing tables (order matters - foreign keys)
+DROP TABLE IF EXISTS public.api_logs CASCADE;
+DROP TABLE IF EXISTS public.apis CASCADE;
+DROP TABLE IF EXISTS public.cors_proxies CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+-- =============================================
+-- STEP 2: CREATE TABLES
+-- =============================================
+
+-- Profiles Table
+CREATE TABLE public.profiles (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id uuid NOT NULL UNIQUE,
     email text,
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
--- APIs Table (stores API configurations)
-CREATE TABLE IF NOT EXISTS public.apis (
+-- APIs Table
+CREATE TABLE public.apis (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id uuid NOT NULL,
     name text NOT NULL,
@@ -34,11 +53,11 @@ CREATE TABLE IF NOT EXISTS public.apis (
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
--- API Logs Table (stores hit logs)
-CREATE TABLE IF NOT EXISTS public.api_logs (
+-- API Logs Table
+CREATE TABLE public.api_logs (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id uuid NOT NULL,
-    api_id uuid,
+    api_id uuid REFERENCES public.apis(id) ON DELETE CASCADE,
     api_name text NOT NULL,
     mode text NOT NULL,
     success boolean NOT NULL,
@@ -48,8 +67,8 @@ CREATE TABLE IF NOT EXISTS public.api_logs (
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
--- CORS Proxies Table (stores proxy configurations)
-CREATE TABLE IF NOT EXISTS public.cors_proxies (
+-- CORS Proxies Table
+CREATE TABLE public.cors_proxies (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id uuid NOT NULL,
     name text NOT NULL,
@@ -60,7 +79,7 @@ CREATE TABLE IF NOT EXISTS public.cors_proxies (
 );
 
 -- =============================================
--- 2. ENABLE ROW LEVEL SECURITY (RLS)
+-- STEP 3: ENABLE ROW LEVEL SECURITY
 -- =============================================
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -69,82 +88,82 @@ ALTER TABLE public.api_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cors_proxies ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
--- 3. RLS POLICIES - PROFILES
+-- STEP 4: RLS POLICIES - PROFILES
 -- =============================================
 
-CREATE POLICY "Users can view their own profile"
-ON public.profiles FOR SELECT
+CREATE POLICY "Users can view their own profile" 
+ON public.profiles FOR SELECT 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own profile"
-ON public.profiles FOR INSERT
+CREATE POLICY "Users can insert their own profile" 
+ON public.profiles FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own profile"
-ON public.profiles FOR UPDATE
+CREATE POLICY "Users can update their own profile" 
+ON public.profiles FOR UPDATE 
 USING (auth.uid() = user_id);
 
 -- =============================================
--- 4. RLS POLICIES - APIS
+-- STEP 5: RLS POLICIES - APIS
 -- =============================================
 
-CREATE POLICY "Users can view their own APIs"
-ON public.apis FOR SELECT
+CREATE POLICY "Users can view their own APIs" 
+ON public.apis FOR SELECT 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own APIs"
-ON public.apis FOR INSERT
+CREATE POLICY "Users can insert their own APIs" 
+ON public.apis FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own APIs"
-ON public.apis FOR UPDATE
+CREATE POLICY "Users can update their own APIs" 
+ON public.apis FOR UPDATE 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete their own APIs"
-ON public.apis FOR DELETE
+CREATE POLICY "Users can delete their own APIs" 
+ON public.apis FOR DELETE 
 USING (auth.uid() = user_id);
 
 -- =============================================
--- 5. RLS POLICIES - API LOGS
+-- STEP 6: RLS POLICIES - API LOGS
 -- =============================================
 
-CREATE POLICY "Users can view their own logs"
-ON public.api_logs FOR SELECT
+CREATE POLICY "Users can view their own logs" 
+ON public.api_logs FOR SELECT 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own logs"
-ON public.api_logs FOR INSERT
+CREATE POLICY "Users can insert their own logs" 
+ON public.api_logs FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete their own logs"
-ON public.api_logs FOR DELETE
+CREATE POLICY "Users can delete their own logs" 
+ON public.api_logs FOR DELETE 
 USING (auth.uid() = user_id);
 
 -- =============================================
--- 6. RLS POLICIES - CORS PROXIES
+-- STEP 7: RLS POLICIES - CORS PROXIES
 -- =============================================
 
-CREATE POLICY "Users can view their own proxies"
-ON public.cors_proxies FOR SELECT
+CREATE POLICY "Users can view their own proxies" 
+ON public.cors_proxies FOR SELECT 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own proxies"
-ON public.cors_proxies FOR INSERT
+CREATE POLICY "Users can insert their own proxies" 
+ON public.cors_proxies FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own proxies"
-ON public.cors_proxies FOR UPDATE
+CREATE POLICY "Users can update their own proxies" 
+ON public.cors_proxies FOR UPDATE 
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete their own proxies"
-ON public.cors_proxies FOR DELETE
+CREATE POLICY "Users can delete their own proxies" 
+ON public.cors_proxies FOR DELETE 
 USING (auth.uid() = user_id);
 
 -- =============================================
--- 7. FUNCTIONS
+-- STEP 8: FUNCTIONS
 -- =============================================
 
--- Function to auto-create profile on new user signup
+-- Auto-create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -158,41 +177,56 @@ BEGIN
 END;
 $$;
 
--- Function to update timestamps
+-- Auto-update timestamps
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SET search_path = public
+AS $$
 BEGIN
     NEW.updated_at = now();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$;
 
 -- =============================================
--- 8. TRIGGERS
+-- STEP 9: TRIGGERS
 -- =============================================
 
--- Trigger to auto-create profile when user signs up
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- Profile auto-create on user signup
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Trigger to update updated_at on apis table
-DROP TRIGGER IF EXISTS update_apis_updated_at ON public.apis;
+-- Auto-update updated_at on apis
 CREATE TRIGGER update_apis_updated_at
     BEFORE UPDATE ON public.apis
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_updated_at_column();
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- =============================================
--- 9. INDEXES (Optional - for better performance)
+-- STEP 10: INDEXES (Performance)
 -- =============================================
 
-CREATE INDEX IF NOT EXISTS idx_apis_user_id ON public.apis(user_id);
-CREATE INDEX IF NOT EXISTS idx_api_logs_user_id ON public.api_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON public.api_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cors_proxies_user_id ON public.cors_proxies(user_id);
+CREATE INDEX idx_profiles_user_id ON public.profiles(user_id);
+CREATE INDEX idx_apis_user_id ON public.apis(user_id);
+CREATE INDEX idx_apis_enabled ON public.apis(enabled);
+CREATE INDEX idx_api_logs_user_id ON public.api_logs(user_id);
+CREATE INDEX idx_api_logs_created_at ON public.api_logs(created_at DESC);
+CREATE INDEX idx_api_logs_api_id ON public.api_logs(api_id);
+CREATE INDEX idx_cors_proxies_user_id ON public.cors_proxies(user_id);
+CREATE INDEX idx_cors_proxies_is_active ON public.cors_proxies(is_active);
 
 -- =============================================
--- DONE! Your database is ready.
+-- STEP 11: ENABLE REALTIME FOR LOGS
+-- =============================================
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.api_logs;
+
+-- =============================================
+-- ✅ SETUP COMPLETE!
+-- =============================================
+-- Ab aap:
+-- 1. App me signup karo
+-- 2. Login karo
+-- 3. APIs add karo aur hit karo!
 -- =============================================
