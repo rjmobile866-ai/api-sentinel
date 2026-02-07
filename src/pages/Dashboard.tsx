@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/dashboard/Header';
@@ -15,12 +15,28 @@ import { Plus, Database, Terminal, Loader2 } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
+  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, migrateFromLocalStorage } = useApis();
   const { logs, addLog, clearLogs } = useLogs();
   const { proxies } = useProxies();
   
   const [formOpen, setFormOpen] = useState(false);
   const [editingApi, setEditingApi] = useState<any>(null);
+  const [showMigration, setShowMigration] = useState(false);
+
+  useEffect(() => {
+    // Check if old localStorage data exists
+    const hasOldData = localStorage.getItem('admin_apis');
+    if (hasOldData) {
+      try {
+        const oldApis = JSON.parse(hasOldData);
+        if (Array.isArray(oldApis) && oldApis.length > 0) {
+          setShowMigration(true);
+        }
+      } catch (e) {
+        console.error('Error checking old data:', e);
+      }
+    }
+  }, []);
 
   if (authLoading) {
     return (
@@ -73,6 +89,11 @@ const Dashboard = () => {
     setEditingApi(null);
   };
 
+  const handleMigration = async () => {
+    await migrateFromLocalStorage();
+    setShowMigration(false);
+  };
+
   return (
     <div className="min-h-screen bg-background scanline">
       <div className="absolute inset-0 gradient-matrix pointer-events-none" />
@@ -81,6 +102,28 @@ const Dashboard = () => {
 
       <main className="container mx-auto px-4 py-6 space-y-6 relative">
         <DisclaimerBanner />
+
+        {/* Migration Banner */}
+        {showMigration && (
+          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 space-y-3">
+            <p className="text-sm text-primary/80">📦 Puraane localStorage APIs database me migrate karne ke liye ready hain</p>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleMigration}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
+              >
+                Migrate Now
+              </Button>
+              <Button
+                onClick={() => setShowMigration(false)}
+                variant="outline"
+                className="text-sm"
+              >
+                Skip
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Hit Engine */}
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />

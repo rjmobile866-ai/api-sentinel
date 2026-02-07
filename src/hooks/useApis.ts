@@ -22,6 +22,9 @@ interface Api {
 // Placeholder user_id for admin panel (password-based auth)
 const ADMIN_USER_ID = '00000000-0000-0000-0000-000000000000';
 
+// Legacy localStorage key for migration
+const LEGACY_STORAGE_KEY = 'admin_apis';
+
 export const useApis = () => {
   const [apis, setApis] = useState<Api[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,9 +198,62 @@ export const useApis = () => {
     }
   };
 
+  const migrateFromLocalStorage = async () => {
+    try {
+      const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!stored) {
+        toast.info('No old APIs found in localStorage');
+        return { migrated: 0 };
+      }
+
+      const oldApis: Api[] = JSON.parse(stored);
+      if (!oldApis.length) {
+        toast.info('No old APIs to migrate');
+        return { migrated: 0 };
+      }
+
+      // Insert all old APIs to database
+      const { error } = await supabase
+        .from('apis')
+        .insert(
+          oldApis.map(api => ({
+            user_id: ADMIN_USER_ID,
+            name: api.name,
+            url: api.url,
+            method: api.method,
+            headers: api.headers as unknown as Json,
+            body: api.body as unknown as Json,
+            query_params: api.query_params as unknown as Json,
+            enabled: api.enabled,
+            proxy_enabled: api.proxy_enabled,
+            force_proxy: api.force_proxy,
+            rotation_enabled: api.rotation_enabled,
+            residential_proxy_enabled: api.residential_proxy_enabled ?? false,
+          }))
+        );
+
+      if (error) {
+        console.error('Failed to migrate APIs:', error);
+        toast.error('Migration failed');
+        return { migrated: 0 };
+      }
+
+      // Clear old localStorage and refresh data
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      await fetchApis();
+      
+      toast.success(`✅ ${oldApis.length} APIs migrated to database!`);
+      return { migrated: oldApis.length };
+    } catch (e) {
+      console.error('Migration error:', e);
+      toast.error('Migration failed');
+      return { migrated: 0 };
+    }
+  };
+
   useEffect(() => {
     fetchApis();
   }, []);
 
-  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, refetch: fetchApis };
+  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, refetch: fetchApis, migrateFromLocalStorage };
 };
