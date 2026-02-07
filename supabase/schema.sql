@@ -49,6 +49,7 @@ CREATE TABLE public.apis (
     proxy_enabled boolean DEFAULT false,
     force_proxy boolean DEFAULT true,
     rotation_enabled boolean DEFAULT false,
+    residential_proxy_enabled boolean DEFAULT false,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
