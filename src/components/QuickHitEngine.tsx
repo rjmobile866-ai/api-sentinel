@@ -136,10 +136,19 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         return;
       }
 
-      const statusCode = data?.status || 200;
-      const success = statusCode >= 200 && statusCode < 300;
+      const statusCode: number | null =
+        typeof data?.status_code === 'number' ? data.status_code : null;
 
-      console.log(`[QUICK HIT] ${api.name} - Status: ${statusCode}, Time: ${responseTime}ms`);
+      const success: boolean =
+        typeof data?.success === 'boolean'
+          ? data.success
+          : statusCode !== null
+            ? statusCode >= 200 && statusCode < 300
+            : false;
+
+      console.log(
+        `[QUICK HIT] ${api.name} - Status: ${statusCode ?? 'N/A'}, Success: ${success}, Time: ${responseTime}ms`
+      );
 
       if (success) {
         setSuccessCount(prev => prev + 1);
@@ -152,7 +161,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         success,
         status_code: statusCode,
         response_time: responseTime,
-        error_message: success ? null : (data?.error || 'Unknown error'),
+        error_message: success ? null : (data?.error_message || data?.error || 'Unknown error'),
         mode: 'SERVER',
       });
 
