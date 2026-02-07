@@ -164,36 +164,160 @@ START clicked:
   End For
 ```
 
-### 3. Node.js Fetch Code Parser (ApiImporter)
-Parse code like:
+### 3. Node.js Fetch Code Parser (ApiImporter Component)
+
+Ek powerful code parser jo Node.js/Reqable fetch snippets ko automatically API configuration me convert kare.
+
+#### Input Examples:
+
+**Example 1 - JSON Body:**
 ```javascript
 const myHeaders = new Headers();
 myHeaders.append("Content-Type", "application/json");
-const body = JSON.stringify({ phone: "{PHONE}" });
-fetch("https://api.example.com/otp", {
+myHeaders.append("Authorization", "Bearer xyz123");
+
+const body = JSON.stringify({
+  "mobile": "{PHONE}",
+  "countryCode": "+91"
+});
+
+const requestOptions = {
   method: "POST",
   headers: myHeaders,
-  body: body
+  body: body,
+  redirect: "follow"
+};
+
+fetch("https://api.example.com/v1/otp/send", requestOptions)
+  .then((response) => response.text())
+  .then((result) => console.log(result));
+```
+
+**Example 2 - Form URLEncoded:**
+```javascript
+const urlencoded = new URLSearchParams();
+urlencoded.append("phone", "{PHONE}");
+urlencoded.append("type", "otp");
+
+fetch("https://api.example.com/send", {
+  method: "POST",
+  body: urlencoded
 });
 ```
 
-Parser extracts:
-- URL from fetch() call
-- Method from options
-- Headers from new Headers() or object
-- Body with type detection:
-  - JSON.stringify() → bodyType: 'json'
-  - new URLSearchParams() → bodyType: 'form-urlencoded'
-  - new FormData() → bodyType: 'multipart'
-  - String → bodyType: 'text'
-- Variable resolution (finds const/let/var definitions)
+**Example 3 - Direct Object:**
+```javascript
+fetch("https://api.example.com/otp", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "abc123"
+  },
+  body: JSON.stringify({ phone: "{PHONE}" })
+});
+```
 
-Headers to remove automatically:
-- User-Agent, Cookie, Accept-Encoding, Content-Length
-- All sec-* headers (sec-fetch-mode, sec-ch-ua, etc.)
-- Host, Connection, Priority, Pragma, Cache-Control
+#### Parser Features:
 
-Auto-generate API name from URL path.
+1. **URL Extraction:**
+   - Regex: `fetch\s*\(\s*["'\`]([^"'\`]+)["'\`]`
+   - Handles single quotes, double quotes, backticks
+   - Extracts query params separately
+
+2. **Method Detection:**
+   - From options object: `method: "POST"`
+   - Default: GET if not specified
+
+3. **Headers Parsing:**
+   - `new Headers()` with `.append()` calls
+   - Direct object literal: `headers: { "Key": "Value" }`
+   - Variable reference: `headers: myHeaders` → finds myHeaders definition
+   - Case-insensitive normalization
+
+4. **Body Type Auto-Detection:**
+   | Pattern | Detected Type | Content-Type |
+   |---------|---------------|--------------|
+   | `JSON.stringify({...})` | json | application/json |
+   | `new URLSearchParams()` | form-urlencoded | application/x-www-form-urlencoded |
+   | `new FormData()` | multipart | multipart/form-data (auto) |
+   | Plain string | text | none |
+   | No body | none | none |
+
+5. **Variable Resolution:**
+   - Finds `const/let/var` declarations
+   - Parses object literals: `const body = {...}`
+   - Parses JSON.stringify: `const data = JSON.stringify({...})`
+   - Parses URLSearchParams with .append() calls
+   - Parses FormData with .append() calls
+
+6. **Headers Auto-Cleanup (Remove):**
+   ```typescript
+   const HEADERS_TO_REMOVE = [
+     'user-agent',
+     'cookie', 
+     'accept-encoding',
+     'content-length',
+     'priority',
+     'accept-language',
+     'host',
+     'connection',
+     'upgrade-insecure-requests',
+     'cache-control',
+     'pragma',
+   ];
+   // Also remove all sec-* headers (sec-fetch-mode, sec-ch-ua, etc.)
+   const SEC_HEADER_PATTERN = /^sec-/i;
+   ```
+
+7. **X-Requested-With Fix:**
+   - Replace invalid values (mark.via.gp, mark.via) with 'XMLHttpRequest'
+
+8. **API Name Generation:**
+   - Extract from URL path: `/v1/otp/send` → "POST otp send"
+   - Remove numeric/UUID segments
+   - Fallback to domain name
+
+9. **Validation:**
+   - Check valid URL format
+   - Check valid HTTP method
+   - Check valid JSON in body
+   - Show warnings for unresolved variables
+
+#### Parser Output:
+```typescript
+{
+  name: "POST otp send",
+  url: "https://api.example.com/v1/otp/send",
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer xyz123"
+  },
+  body: {
+    "mobile": "{PHONE}",
+    "countryCode": "+91"
+  },
+  bodyType: "json",
+  query_params: {}
+}
+```
+
+#### UI Components:
+- Large textarea for code input
+- Parse button with loading state
+- Error/Warning display
+- Parsed result preview (editable)
+- API name input field
+- Toggle switches (enabled, proxy, residential)
+- Import button to add API
+
+### 4. Manual API Form Smart Parsing
+
+Manual 'Add API' form me bhi smart parsing:
+- Agar Content-Type `application/x-www-form-urlencoded` ho
+- Body me query string format detect karo: `phone={PHONE}&type=otp`
+- Automatically convert to object: `{ phone: "{PHONE}", type: "otp" }`
+- bodyType set to 'form-urlencoded'
 
 ### 4. Proxy System
 
