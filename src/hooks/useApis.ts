@@ -90,9 +90,15 @@ export const useApis = () => {
     await updateApi(id, { [field]: value } as Partial<Api>);
   };
 
+  const toggleAllApis = async (enabled: boolean) => {
+    const updated = apis.map(api => ({ ...api, enabled }));
+    setApis(updated);
+    saveToStorage(updated);
+  };
+
   useEffect(() => {
     fetchApis();
   }, []);
 
-  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, refetch: fetchApis };
+  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, refetch: fetchApis };
 };

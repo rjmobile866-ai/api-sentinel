@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button';
 import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
-import { Plus, Database, Terminal, Loader2 } from 'lucide-react';
+import { Plus, Database, Terminal, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
+  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis } = useApis();
   const { logs, addLog, clearLogs } = useLogs();
   const { proxies } = useProxies();
   
@@ -88,18 +89,29 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* APIs Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-xl font-bold text-primary text-glow flex items-center gap-2">
                 <Database className="w-5 h-5" />
                 APIs ({apis.length})
               </h2>
-              <Button
-                onClick={() => setFormOpen(true)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add API
-              </Button>
+              <div className="flex items-center gap-3">
+                {apis.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/10 rounded-lg border border-secondary/30">
+                    <span className="text-xs text-muted-foreground">All APIs</span>
+                    <Switch
+                      checked={apis.length > 0 && apis.every(a => a.enabled)}
+                      onCheckedChange={(checked) => toggleAllApis(checked)}
+                    />
+                  </div>
+                )}
+                <Button
+                  onClick={() => setFormOpen(true)}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add API
+                </Button>
+              </div>
             </div>
 
             {apisLoading ? (
