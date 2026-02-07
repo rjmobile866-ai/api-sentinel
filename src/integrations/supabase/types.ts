@@ -77,7 +77,7 @@ export type Database = {
           rotation_enabled: boolean | null
           updated_at: string
           url: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           body?: Json | null
@@ -94,7 +94,7 @@ export type Database = {
           rotation_enabled?: boolean | null
           updated_at?: string
           url: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           body?: Json | null
@@ -111,7 +111,7 @@ export type Database = {
           rotation_enabled?: boolean | null
           updated_at?: string
           url?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
