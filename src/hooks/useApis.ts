@@ -16,32 +16,52 @@ interface Api {
   proxy_enabled: boolean;
   force_proxy: boolean;
   rotation_enabled: boolean;
+  residential_proxy_enabled?: boolean;
 }
 
-// Store APIs in localStorage for unauthenticated admin
-const STORAGE_KEY = 'admin_apis';
+// Placeholder user_id for admin panel (password-based auth)
+const ADMIN_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 export const useApis = () => {
   const [apis, setApis] = useState<Api[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchApis = async () => {
+    setLoading(true);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setApis(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Failed to load APIs from storage:', e);
-    }
-    setLoading(false);
-  };
+      const { data, error } = await supabase
+        .from('apis')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const saveToStorage = (newApis: Api[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newApis));
+      if (error) {
+        console.error('Failed to fetch APIs:', error);
+        toast.error('Failed to load APIs from database');
+        return;
+      }
+
+      // Transform database response to match our Api interface
+      const transformedApis: Api[] = (data || []).map(row => ({
+        id: row.id,
+        name: row.name,
+        url: row.url,
+        method: row.method,
+        headers: (row.headers as Record<string, string>) || {},
+        body: (row.body as Record<string, unknown>) || {},
+        query_params: (row.query_params as Record<string, string>) || {},
+        enabled: row.enabled ?? true,
+        proxy_enabled: row.proxy_enabled ?? false,
+        force_proxy: row.force_proxy ?? true,
+        rotation_enabled: row.rotation_enabled ?? false,
+        residential_proxy_enabled: row.residential_proxy_enabled ?? false,
+      }));
+
+      setApis(transformedApis);
     } catch (e) {
-      console.error('Failed to save APIs:', e);
+      console.error('Failed to load APIs:', e);
+      toast.error('Database connection failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,32 +78,97 @@ export const useApis = () => {
       });
     }
 
-    const newApi: Api = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...apiData,
-    };
-    
-    const updated = [...apis, newApi];
-    setApis(updated);
-    saveToStorage(updated);
-    toast.success('API added successfully');
-    
-    return { success: true, isDuplicate: !!existingApi };
+    try {
+      const { data, error } = await supabase
+        .from('apis')
+        .insert({
+          user_id: ADMIN_USER_ID,
+          name: apiData.name,
+          url: apiData.url,
+          method: apiData.method,
+          headers: apiData.headers as unknown as Json,
+          body: apiData.body as unknown as Json,
+          query_params: apiData.query_params as unknown as Json,
+          enabled: apiData.enabled,
+          proxy_enabled: apiData.proxy_enabled,
+          force_proxy: apiData.force_proxy,
+          rotation_enabled: apiData.rotation_enabled,
+          residential_proxy_enabled: apiData.residential_proxy_enabled ?? false,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to add API:', error);
+        toast.error('Failed to save API to database');
+        return { success: false, isDuplicate: !!existingApi };
+      }
+
+      // Refresh the list
+      await fetchApis();
+      toast.success('API added successfully');
+      return { success: true, isDuplicate: !!existingApi };
+    } catch (e) {
+      console.error('Failed to add API:', e);
+      toast.error('Database error');
+      return { success: false, isDuplicate: !!existingApi };
+    }
   };
 
   const updateApi = async (id: string, updates: Partial<Api>) => {
-    const updated = apis.map(api =>
-      api.id === id ? { ...api, ...updates } : api
-    );
-    setApis(updated);
-    saveToStorage(updated);
+    try {
+      const { error } = await supabase
+        .from('apis')
+        .update({
+          ...(updates.name !== undefined && { name: updates.name }),
+          ...(updates.url !== undefined && { url: updates.url }),
+          ...(updates.method !== undefined && { method: updates.method }),
+          ...(updates.headers !== undefined && { headers: updates.headers as unknown as Json }),
+          ...(updates.body !== undefined && { body: updates.body as unknown as Json }),
+          ...(updates.query_params !== undefined && { query_params: updates.query_params as unknown as Json }),
+          ...(updates.enabled !== undefined && { enabled: updates.enabled }),
+          ...(updates.proxy_enabled !== undefined && { proxy_enabled: updates.proxy_enabled }),
+          ...(updates.force_proxy !== undefined && { force_proxy: updates.force_proxy }),
+          ...(updates.rotation_enabled !== undefined && { rotation_enabled: updates.rotation_enabled }),
+          ...(updates.residential_proxy_enabled !== undefined && { residential_proxy_enabled: updates.residential_proxy_enabled }),
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Failed to update API:', error);
+        toast.error('Failed to update API');
+        return;
+      }
+
+      // Optimistic update
+      setApis(prev => prev.map(api => 
+        api.id === id ? { ...api, ...updates } : api
+      ));
+    } catch (e) {
+      console.error('Failed to update API:', e);
+      toast.error('Database error');
+    }
   };
 
   const deleteApi = async (id: string) => {
-    const updated = apis.filter(api => api.id !== id);
-    setApis(updated);
-    saveToStorage(updated);
-    toast.success('API deleted');
+    try {
+      const { error } = await supabase
+        .from('apis')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Failed to delete API:', error);
+        toast.error('Failed to delete API');
+        return;
+      }
+
+      setApis(prev => prev.filter(api => api.id !== id));
+      toast.success('API deleted');
+    } catch (e) {
+      console.error('Failed to delete API:', e);
+      toast.error('Database error');
+    }
   };
 
   const toggleApiField = async (id: string, field: string, value: boolean) => {
@@ -91,9 +176,23 @@ export const useApis = () => {
   };
 
   const toggleAllApis = async (enabled: boolean) => {
-    const updated = apis.map(api => ({ ...api, enabled }));
-    setApis(updated);
-    saveToStorage(updated);
+    try {
+      const { error } = await supabase
+        .from('apis')
+        .update({ enabled })
+        .neq('id', ''); // Update all
+
+      if (error) {
+        console.error('Failed to toggle all APIs:', error);
+        toast.error('Failed to update APIs');
+        return;
+      }
+
+      setApis(prev => prev.map(api => ({ ...api, enabled })));
+    } catch (e) {
+      console.error('Failed to toggle all APIs:', e);
+      toast.error('Database error');
+    }
   };
 
   useEffect(() => {
