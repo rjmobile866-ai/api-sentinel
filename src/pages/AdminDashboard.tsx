@@ -15,10 +15,11 @@ import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Plus, Database, Loader2, LogOut, Code, List, Settings } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 const AdminDashboard = () => {
-  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField } = useApis();
+  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis } = useApis();
   const { logs, addLog, clearLogs } = useLogs();
   const { proxies } = useProxies();
   const { settings } = useSiteSettings();
@@ -209,20 +210,31 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
               {/* APIs Section */}
               <div className="space-y-3 sm:space-y-4">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <h2 className="text-base sm:text-xl font-bold text-primary text-glow flex items-center gap-2">
                     <Database className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="truncate">{settings.apiListTitle}</span>
                   </h2>
-                  <Button
-                    onClick={() => setFormOpen(true)}
-                    size="sm"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary text-xs sm:text-sm px-2 sm:px-3"
-                  >
-                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                    <span className="hidden sm:inline">{settings.addApiButtonText}</span>
-                    <span className="sm:hidden">Add</span>
-                  </Button>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {apis.length > 0 && (
+                      <div className="flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-secondary/10 rounded-lg border border-secondary/30">
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">All</span>
+                        <Switch
+                          checked={apis.length > 0 && apis.every(a => a.enabled)}
+                          onCheckedChange={(checked) => toggleAllApis(checked)}
+                        />
+                      </div>
+                    )}
+                    <Button
+                      onClick={() => setFormOpen(true)}
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary text-xs sm:text-sm px-2 sm:px-3"
+                    >
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                      <span className="hidden sm:inline">{settings.addApiButtonText}</span>
+                      <span className="sm:hidden">Add</span>
+                    </Button>
+                  </div>
                 </div>
 
                 {apisLoading ? (
