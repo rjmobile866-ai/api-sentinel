@@ -180,10 +180,17 @@ export const useApis = () => {
 
   const toggleAllApis = async (enabled: boolean) => {
     try {
+      // Get all API ids to update
+      const apiIds = apis.map(api => api.id);
+      if (apiIds.length === 0) {
+        toast.info('No APIs to update');
+        return;
+      }
+
       const { error } = await supabase
         .from('apis')
         .update({ enabled })
-        .neq('id', ''); // Update all
+        .in('id', apiIds);
 
       if (error) {
         console.error('Failed to toggle all APIs:', error);
@@ -192,6 +199,7 @@ export const useApis = () => {
       }
 
       setApis(prev => prev.map(api => ({ ...api, enabled })));
+      toast.success(`All APIs ${enabled ? 'enabled' : 'disabled'}`);
     } catch (e) {
       console.error('Failed to toggle all APIs:', e);
       toast.error('Database error');
