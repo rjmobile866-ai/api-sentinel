@@ -34,8 +34,6 @@ interface QuickHitEngineProps {
   }) => void;
 }
 
-const STORAGE_KEY = 'admin_apis';
-
 const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const { settings } = useSiteSettings();
   const [phone, setPhone] = useState('');
@@ -47,29 +45,48 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [roundCount, setRoundCount] = useState(0);
   const [currentApi, setCurrentApi] = useState<string | null>(null);
   const [apis, setApis] = useState<Api[]>([]);
+  const [loading, setLoading] = useState(true);
   const stopRef = React.useRef(false);
 
-  // Load APIs from localStorage (read-only)
+  // Load APIs from database
   useEffect(() => {
-    const loadApis = () => {
+    const loadApis = async () => {
+      setLoading(true);
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsedApis = JSON.parse(stored) as Api[];
-          setApis(parsedApis);
+        const { data, error } = await supabase
+          .from('apis')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('[QUICK HIT] Failed to fetch APIs:', error);
+          return;
         }
+
+        const transformedApis: Api[] = (data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          url: row.url,
+          method: row.method,
+          headers: (row.headers as Record<string, string>) || {},
+          body: (row.body as Record<string, unknown>) || {},
+          query_params: (row.query_params as Record<string, string>) || {},
+          enabled: row.enabled ?? true,
+          proxy_enabled: row.proxy_enabled ?? false,
+          force_proxy: row.force_proxy ?? true,
+          rotation_enabled: row.rotation_enabled ?? false,
+        }));
+
+        setApis(transformedApis);
+        console.log(`[QUICK HIT] Loaded ${transformedApis.length} APIs from database`);
       } catch (e) {
         console.error('[QUICK HIT] Failed to load APIs:', e);
+      } finally {
+        setLoading(false);
       }
     };
     
     loadApis();
-    
-    // Listen for storage changes (when admin adds new APIs)
-    const handleStorageChange = () => loadApis();
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Get only enabled APIs
