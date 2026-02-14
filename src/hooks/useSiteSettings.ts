@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   addApiButtonText: 'Add API',
   noApisText: 'No APIs added yet',
   logoUrl: '',
-  adminPassword: '12345',
+  adminPassword: 'xyzdark6767@@',
   residentialProxyUrl: '',
 };
 

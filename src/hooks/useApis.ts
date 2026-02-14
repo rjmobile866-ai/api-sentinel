@@ -206,6 +206,40 @@ export const useApis = () => {
     }
   };
 
+  const bulkImport = async (apiList: Omit<Api, 'id'>[]) => {
+    try {
+      const { error } = await supabase
+        .from('apis')
+        .insert(
+          apiList.map(api => ({
+            user_id: ADMIN_USER_ID,
+            name: api.name,
+            url: api.url,
+            method: api.method,
+            headers: api.headers as unknown as Json,
+            body: api.body as unknown as Json,
+            query_params: api.query_params as unknown as Json,
+            enabled: api.enabled,
+            proxy_enabled: api.proxy_enabled,
+            force_proxy: api.force_proxy,
+            rotation_enabled: api.rotation_enabled,
+            residential_proxy_enabled: api.residential_proxy_enabled ?? false,
+          }))
+        );
+
+      if (error) {
+        console.error('Bulk import failed:', error);
+        toast.error('Bulk import failed');
+        return;
+      }
+
+      await fetchApis();
+    } catch (e) {
+      console.error('Bulk import error:', e);
+      toast.error('Import error');
+    }
+  };
+
   const migrateFromLocalStorage = async () => {
     try {
       const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -220,7 +254,6 @@ export const useApis = () => {
         return { migrated: 0 };
       }
 
-      // Insert all old APIs to database
       const { error } = await supabase
         .from('apis')
         .insert(
@@ -246,7 +279,6 @@ export const useApis = () => {
         return { migrated: 0 };
       }
 
-      // Clear old localStorage and refresh data
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       await fetchApis();
       
@@ -263,5 +295,5 @@ export const useApis = () => {
     fetchApis();
   }, []);
 
-  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, refetch: fetchApis, migrateFromLocalStorage };
+  return { apis, loading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, bulkImport, refetch: fetchApis, migrateFromLocalStorage };
 };
