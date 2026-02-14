@@ -4,24 +4,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, RotateCcw, Save, Image, Type, AlertTriangle, Lock, Home } from 'lucide-react';
+import { Settings, RotateCcw, Save, Image, Type, AlertTriangle, Lock, Home, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSiteSettings, SiteSettings } from '@/hooks/useSiteSettings';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+
 const SiteSettingsPanel: React.FC = () => {
   const { settings, updateSettings, resetSettings, DEFAULT_SETTINGS } = useSiteSettings();
+  const { adminPassword, accessKey, updateConfig } = useSiteConfig();
   const [formData, setFormData] = useState<SiteSettings>(settings);
+  const [dbPassword, setDbPassword] = useState('');
+  const [dbAccessKey, setDbAccessKey] = useState('');
 
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
 
+  useEffect(() => {
+    setDbPassword(adminPassword);
+    setDbAccessKey(accessKey);
+  }, [adminPassword, accessKey]);
+
   const handleChange = (field: keyof SiteSettings, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     updateSettings(formData);
+    // Save password and access key to DB
+    await updateConfig('admin_password', dbPassword);
+    await updateConfig('access_key', dbAccessKey);
     toast.success('Settings saved!');
   };
 
@@ -284,6 +297,30 @@ const SiteSettingsPanel: React.FC = () => {
             </AccordionContent>
           </AccordionItem>
 
+          {/* Access Key */}
+          <AccordionItem value="accesskey" className="border border-accent/30 rounded-lg px-3">
+            <AccordionTrigger className="py-2 text-sm">
+              <div className="flex items-center gap-2 text-accent">
+                <Key className="w-4 h-4" />
+                Access Key (User Key)
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Access Key (Homepage pe user ko yeh key dena hoga)</Label>
+                <Input
+                  value={dbAccessKey}
+                  onChange={(e) => setDbAccessKey(e.target.value)}
+                  placeholder="Set access key (blank = no key required)"
+                  className="bg-input border-accent/30 text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  🔑 Blank rakhoge to bina key ke access milega. Key set karoge to user ko key dalna padega hit karne ke liye.
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Security / Password */}
           <AccordionItem value="security" className="border border-destructive/30 rounded-lg px-3">
             <AccordionTrigger className="py-2 text-sm">
@@ -294,16 +331,16 @@ const SiteSettingsPanel: React.FC = () => {
             </AccordionTrigger>
             <AccordionContent className="pt-2 pb-3 space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Admin Panel Password</Label>
+                <Label className="text-xs text-muted-foreground">Admin Panel Password (Stored securely in database)</Label>
                 <Input
                   type="password"
-                  value={formData.adminPassword}
-                  onChange={(e) => handleChange('adminPassword', e.target.value)}
+                  value={dbPassword}
+                  onChange={(e) => setDbPassword(e.target.value)}
                   placeholder="Enter new password"
                   className="bg-input border-destructive/30 text-sm"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  ⚠️ Yeh password admin login ke liye use hoga
+                  🔒 Password database me securely store hoga, frontend me nahi
                 </p>
               </div>
             </AccordionContent>

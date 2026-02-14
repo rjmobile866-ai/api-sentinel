@@ -3,22 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Terminal, AlertTriangle, Loader2, Lock } from 'lucide-react';
+import { Shield, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { settings } = useSiteSettings();
+  const { adminPassword, loading } = useSiteConfig();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Check against stored password from settings
-    const storedPassword = settings.adminPassword || '12345';
+    // Check against stored password from database
+    const storedPassword = adminPassword || 'xyzdark6767@@';
     if (password === storedPassword) {
       // Store admin session in sessionStorage
       sessionStorage.setItem('adminAuth', 'true');

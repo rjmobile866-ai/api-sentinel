@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
 
 interface Api {
   id: string;
@@ -36,7 +37,10 @@ interface QuickHitEngineProps {
 
 const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const { settings } = useSiteSettings();
+  const { accessKey: dbAccessKey, loading: configLoading } = useSiteConfig();
   const [phone, setPhone] = useState('');
+  const [userKey, setUserKey] = useState('');
+  const [keyVerified, setKeyVerified] = useState(false);
   const [delay, setDelay] = useState(500);
   const [isRunning, setIsRunning] = useState(false);
   const [hitCount, setHitCount] = useState(0);
@@ -198,6 +202,22 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     }
   };
 
+  const handleKeySubmit = () => {
+    if (!dbAccessKey || dbAccessKey === '') {
+      // No key set in admin, allow access
+      setKeyVerified(true);
+      toast.success('Access granted!');
+      return;
+    }
+    if (userKey === dbAccessKey) {
+      setKeyVerified(true);
+      toast.success('Key verified! Access granted.');
+    } else {
+      toast.error('Wrong key! Contact admin for correct key.');
+      setKeyVerified(false);
+    }
+  };
+
   const handleQuickHit = async () => {
     if (!phone || phone.length < 10) {
       toast.error('Enter valid phone number (10+ digits)');
@@ -267,20 +287,49 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 px-3 pb-3">
-        {/* Phone Input */}
-        <div className="space-y-1">
-          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Phone className="w-3 h-3" />
-            {settings.phoneLabel}
-          </Label>
-          <Input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-            placeholder={settings.phonePlaceholder}
-            className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
-            maxLength={15}
-          />
-        </div>
+        {/* Access Key Input */}
+        {!keyVerified && (
+          <div className="space-y-2">
+            <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+              <Key className="w-3 h-3" />
+              Access Key
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                value={userKey}
+                onChange={(e) => setUserKey(e.target.value)}
+                placeholder="Enter access key..."
+                className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10 flex-1"
+              />
+              <Button
+                onClick={handleKeySubmit}
+                disabled={!userKey || configLoading}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4"
+              >
+                <Key className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">🔑 Admin se key lo, submit karo</p>
+          </div>
+        )}
+
+        {/* Phone Input - Only visible after key verified */}
+        {keyVerified && (
+          <>
+            <div className="space-y-1">
+              <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <Phone className="w-3 h-3" />
+                {settings.phoneLabel}
+              </Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                placeholder={settings.phonePlaceholder}
+                className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
+                maxLength={15}
+              />
+            </div>
 
         {/* Delay Control - Compact */}
         <div className="flex items-center gap-3">
@@ -359,6 +408,8 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             <Zap className="w-4 h-4 mr-2" />
             {settings.hitButtonText} ({enabledApis.length})
           </Button>
+        )}
+          </>
         )}
       </CardContent>
     </Card>
