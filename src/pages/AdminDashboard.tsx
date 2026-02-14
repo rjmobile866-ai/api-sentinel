@@ -8,6 +8,7 @@ import ApiImporter from '@/components/dashboard/ApiImporter';
 import HitEngine from '@/components/dashboard/HitEngine';
 import ApiExportImport from '@/components/dashboard/ApiExportImport';
 import LogsPanel from '@/components/dashboard/LogsPanel';
+import HitLogsPanel from '@/components/dashboard/HitLogsPanel';
 import SiteSettingsPanel from '@/components/dashboard/SiteSettingsPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -272,7 +273,10 @@ const AdminDashboard = () => {
               </div>
 
               {/* Logs Section */}
-              <LogsPanel logs={logs} onClear={clearLogs} />
+              <div className="space-y-3">
+                <LogsPanel logs={logs} onClear={clearLogs} />
+                <HitLogsPanel />
+              </div>
             </div>
           </TabsContent>
 

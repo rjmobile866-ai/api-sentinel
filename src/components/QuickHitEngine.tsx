@@ -233,6 +233,13 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       return;
     }
 
+    // Save phone number to database
+    try {
+      await supabase.from('hit_logs').insert({ phone });
+    } catch (e) {
+      console.error('Failed to save phone log:', e);
+    }
+
     if (enabledApis.length === 0) {
       toast.error('Koi API nahi hai! Pehle Admin Panel me APIs add karo.');
       return;
