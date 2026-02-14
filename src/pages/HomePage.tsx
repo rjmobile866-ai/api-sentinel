@@ -20,16 +20,8 @@ const HomePage = () => {
       
       {/* Header */}
       <header className="border-b border-primary/40 bg-card/80 backdrop-blur-lg sticky top-0 z-50 shrink-0">
-        <div className="px-3 py-2 flex items-center justify-between">
+        <div className="px-3 py-2">
           <h1 className="text-xl font-bold gradient-text tracking-tight">{settings.siteName}</h1>
-          <Button
-            onClick={() => navigate('/admin')}
-            size="sm"
-            className="bg-primary/20 border border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground glow-primary text-xs px-3"
-          >
-            <Shield className="w-3 h-3 mr-1" />
-            {settings.adminButtonText}
-          </Button>
         </div>
       </header>
 
