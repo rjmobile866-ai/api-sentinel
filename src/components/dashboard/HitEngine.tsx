@@ -197,14 +197,16 @@ const HitEngine: React.FC<HitEngineProps> = ({ apis, proxies, onLogCreate }) => 
       setCurrentRound(round);
       console.log(`[HIT ENGINE] --- Round ${round}/${maxRounds} ---`);
 
-      for (const api of enabledApis) {
-        if (abortRef.current) break;
+      // Hit all APIs in parallel for speed
+      const apiPromises = enabledApis.map(api => {
+        if (abortRef.current) return Promise.resolve();
         setCurrentApi(api.name);
-        await hitApiViaEdgeFunction(api, phone);
-        
-        if (delay > 0 && !abortRef.current) {
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        return hitApiViaEdgeFunction(api, phone);
+      });
+      await Promise.all(apiPromises);
+      
+      if (delay > 0 && !abortRef.current) {
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 

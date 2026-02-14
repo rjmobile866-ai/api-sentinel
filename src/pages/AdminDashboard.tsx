@@ -6,6 +6,7 @@ import ApiCard from '@/components/dashboard/ApiCard';
 import ApiForm from '@/components/dashboard/ApiForm';
 import ApiImporter from '@/components/dashboard/ApiImporter';
 import HitEngine from '@/components/dashboard/HitEngine';
+import ApiExportImport from '@/components/dashboard/ApiExportImport';
 import LogsPanel from '@/components/dashboard/LogsPanel';
 import SiteSettingsPanel from '@/components/dashboard/SiteSettingsPanel';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 const AdminDashboard = () => {
-  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis } = useApis();
+  const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, bulkImport } = useApis();
   const { logs, addLog, clearLogs } = useLogs();
   const { proxies } = useProxies();
   const { settings } = useSiteSettings();
@@ -278,7 +279,10 @@ const AdminDashboard = () => {
           {/* Import API Tab */}
           <TabsContent value="import">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
-              <ApiImporter onApiAdd={handleImportApi} />
+              <div className="space-y-3 sm:space-y-4">
+                <ApiImporter onApiAdd={handleImportApi} />
+                <ApiExportImport apis={apis} onBulkImport={bulkImport} />
+              </div>
               
               {/* Logs Section */}
               <LogsPanel logs={logs} onClear={clearLogs} />

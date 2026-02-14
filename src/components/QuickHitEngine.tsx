@@ -225,16 +225,15 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       currentRound++;
       setRoundCount(currentRound);
       
-      for (const api of enabledApis) {
-        if (stopRef.current) break;
+      // Hit all APIs in parallel for speed
+      const apiPromises = enabledApis.map(api => {
+        if (stopRef.current) return Promise.resolve();
         setCurrentApi(api.name);
-        await hitApiViaEdgeFunction(api, phone);
-        setHitCount(prev => prev + 1);
-        
-        if (delay > 0 && !stopRef.current) {
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
+        return hitApiViaEdgeFunction(api, phone).then(() => {
+          setHitCount(prev => prev + 1);
+        });
+      });
+      await Promise.all(apiPromises);
       
       // Small pause between rounds
       if (!stopRef.current && delay > 0) {
