@@ -287,49 +287,45 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 px-3 pb-3">
-        {/* Access Key Input */}
-        {!keyVerified && (
-          <div className="space-y-2">
-            <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-              <Key className="w-3 h-3" />
-              Access Key
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                value={userKey}
-                onChange={(e) => setUserKey(e.target.value)}
-                placeholder="Enter access key..."
-                className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10 flex-1"
-              />
-              <Button
-                onClick={handleKeySubmit}
-                disabled={!userKey || configLoading}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4"
-              >
-                <Key className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground">🔑 Admin se key lo, submit karo</p>
+        {/* Access Key Input - Always at Top */}
+        <div className="space-y-2">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Key className="w-3 h-3" />
+            Access Key
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              value={userKey}
+              onChange={(e) => setUserKey(e.target.value)}
+              placeholder="Enter access key..."
+              className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10 flex-1"
+            />
+            <Button
+              onClick={handleKeySubmit}
+              disabled={!userKey || configLoading}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4"
+            >
+              <Key className="w-4 h-4" />
+            </Button>
           </div>
-        )}
+          <p className="text-[10px] text-muted-foreground">🔑 Admin se key lo, submit karo</p>
+        </div>
 
-        {/* Phone Input - Only visible after key verified */}
-        {keyVerified && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Phone className="w-3 h-3" />
-                {settings.phoneLabel}
-              </Label>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                placeholder={settings.phonePlaceholder}
-                className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
-                maxLength={15}
-              />
-            </div>
+        {/* Phone Input - Always Visible */}
+        <div className="space-y-1">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Phone className="w-3 h-3" />
+            {settings.phoneLabel}
+          </Label>
+          <Input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+            placeholder={settings.phonePlaceholder}
+            className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
+            maxLength={15}
+          />
+        </div>
 
         {/* Delay Control - Compact */}
         <div className="flex items-center gap-3">
@@ -408,8 +404,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             <Zap className="w-4 h-4 mr-2" />
             {settings.hitButtonText} ({enabledApis.length})
           </Button>
-        )}
-          </>
         )}
       </CardContent>
     </Card>
