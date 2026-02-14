@@ -219,6 +219,10 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   };
 
   const handleQuickHit = async () => {
+    if (!keyVerified) {
+      toast.error('Pehle access key enter karo!');
+      return;
+    }
     if (!phone || phone.length < 10) {
       toast.error('Enter valid phone number (10+ digits)');
       return;
