@@ -21,23 +21,7 @@ const HomePage = () => {
       {/* Header */}
       <header className="border-b border-primary/40 bg-card/80 backdrop-blur-lg sticky top-0 z-50 shrink-0">
         <div className="px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {settings.logoUrl ? (
-              <img 
-                src={settings.logoUrl} 
-                alt="Logo" 
-                className="w-8 h-8 rounded-lg object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center glow-primary">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-            )}
-            <h1 className="text-xl font-bold gradient-text tracking-tight">{settings.siteName}</h1>
-          </div>
+          <h1 className="text-xl font-bold gradient-text tracking-tight">{settings.siteName}</h1>
           <Button
             onClick={() => navigate('/admin')}
             size="sm"
