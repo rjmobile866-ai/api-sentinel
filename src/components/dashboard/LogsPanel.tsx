@@ -27,14 +27,16 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ logs, onClear }) => {
   };
 
   return (
-    <Card className="border-primary/30 bg-card/50 backdrop-blur">
-      <CardHeader className="py-2 px-3">
+    <Card className="neon-border bg-card/80 backdrop-blur-lg overflow-hidden">
+      <div className="h-0.5 w-full bg-gradient-to-r from-secondary via-primary to-secondary" />
+      
+      <CardHeader className="py-2.5 px-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-primary text-glow flex items-center gap-2 text-sm">
+          <CardTitle className="text-primary text-glow flex items-center gap-2 text-sm tracking-[0.15em]">
             <Terminal className="w-4 h-4" />
             LOGS
             {logs.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              <Badge className="text-[10px] px-2 bg-primary/15 text-primary border-primary/30">
                 {logs.length}
               </Badge>
             )}
@@ -52,37 +54,37 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ logs, onClear }) => {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-32">
-          <div className="space-y-1 px-3 pb-2">
+        <ScrollArea className="h-36">
+          <div className="space-y-1 px-4 pb-3">
             {logs.length === 0 ? (
-              <div className="text-center py-3 text-muted-foreground">
-                <Terminal className="w-5 h-5 mx-auto mb-1 opacity-50" />
-                <p className="text-xs">Koi log nahi. API hit karo.</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <Terminal className="w-5 h-5 mx-auto mb-1.5 opacity-40" />
+                <p className="text-xs tracking-wider">Koi log nahi. API hit karo.</p>
               </div>
             ) : (
               logs.map((log) => (
                 <div
                   key={log.id}
-                  className={`p-1.5 rounded text-xs font-mono border ${
+                  className={`p-2 rounded text-xs font-mono border transition-all duration-200 ${
                     log.success
-                      ? 'bg-accent/10 border-accent/30'
-                      : 'bg-destructive/10 border-destructive/30'
+                      ? 'bg-primary/5 border-primary/20 hover:border-primary/40'
+                      : 'bg-destructive/5 border-destructive/20 hover:border-destructive/40'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       {log.success ? (
-                        <CheckCircle className="w-3 h-3 text-accent shrink-0" />
+                        <CheckCircle className="w-3 h-3 text-primary shrink-0" />
                       ) : (
                         <XCircle className="w-3 h-3 text-destructive shrink-0" />
                       )}
-                      <span className={`truncate ${log.success ? 'text-accent' : 'text-destructive'}`}>
+                      <span className={`truncate ${log.success ? 'text-primary' : 'text-destructive'}`}>
                         {log.api_name}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] shrink-0">
                       {log.status_code && (
-                        <span className={log.status_code < 400 ? 'text-accent' : 'text-destructive'}>
+                        <span className={log.status_code < 400 ? 'text-primary' : 'text-destructive'}>
                           {log.status_code}
                         </span>
                       )}
