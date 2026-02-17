@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X, Key } from 'lucide-react';
+import { Zap, Phone, Clock, RotateCcw, Wifi, Activity, AlertCircle, X, Key, Crosshair } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -52,7 +52,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   const [loading, setLoading] = useState(true);
   const stopRef = React.useRef(false);
 
-  // Load APIs from database
   useEffect(() => {
     const loadApis = async () => {
       setLoading(true);
@@ -93,7 +92,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     loadApis();
   }, []);
 
-  // Get only enabled APIs
   const enabledApis = apis.filter(api => api.enabled);
 
   const replacePlaceholders = (text: string, phoneNumber: string): string => {
@@ -129,8 +127,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
         urlWithParams = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${params.toString()}`;
       }
 
-      console.log(`[QUICK HIT] Calling Edge Function for: ${api.name}`);
-
       const { data, error } = await supabase.functions.invoke('hit-api', {
         body: {
           url: urlWithParams,
@@ -143,9 +139,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       const responseTime = Date.now() - startTime;
 
       if (error) {
-        console.error(`[QUICK HIT] Edge function error for ${api.name}:`, error);
         setFailCount(prev => prev + 1);
-        
         onLogCreate?.({
           api_name: api.name,
           success: false,
@@ -167,10 +161,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             ? statusCode >= 200 && statusCode < 300
             : false;
 
-      console.log(
-        `[QUICK HIT] ${api.name} - Status: ${statusCode ?? 'N/A'}, Success: ${success}, Time: ${responseTime}ms`
-      );
-
       if (success) {
         setSuccessCount(prev => prev + 1);
       } else {
@@ -188,9 +178,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
     } catch (err: any) {
       const responseTime = Date.now() - startTime;
-      console.error(`[QUICK HIT] Exception for ${api.name}:`, err);
       setFailCount(prev => prev + 1);
-      
       onLogCreate?.({
         api_name: api.name,
         success: false,
@@ -204,7 +192,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
   const handleKeySubmit = () => {
     if (!dbAccessKey || dbAccessKey === '') {
-      // No key set in admin, allow access
       setKeyVerified(true);
       toast.success('Access granted!');
       return;
@@ -219,7 +206,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   };
 
   const handleQuickHit = async () => {
-    // Verify key at hit time
     if (dbAccessKey && dbAccessKey !== '') {
       if (userKey !== dbAccessKey) {
         toast.error('Wrong key! Sahi key enter karo.');
@@ -233,7 +219,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       return;
     }
 
-    // Save phone number to database
     try {
       await supabase.from('hit_logs').insert({ phone });
     } catch (e) {
@@ -252,16 +237,13 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
     setFailCount(0);
     setRoundCount(0);
 
-    console.log(`[QUICK HIT] Starting continuous hit with ${enabledApis.length} APIs via Edge Function`);
     toast.info(`🔥 Continuous mode started - ${enabledApis.length} APIs per round`);
 
-    // Continuous loop - keeps running until stopped
     let currentRound = 0;
     while (!stopRef.current) {
       currentRound++;
       setRoundCount(currentRound);
       
-      // Hit all APIs in parallel for speed
       const apiPromises = enabledApis.map(api => {
         if (stopRef.current) return Promise.resolve();
         setCurrentApi(api.name);
@@ -271,7 +253,6 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
       });
       await Promise.all(apiPromises);
       
-      // Small pause between rounds
       if (!stopRef.current && delay > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -290,23 +271,27 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
   };
 
   return (
-    <Card className="border-primary/30 bg-card/50 backdrop-blur">
-      <CardHeader className="py-2 px-3">
-        <CardTitle className="flex items-center justify-between text-primary text-glow text-sm">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4" />
-            {settings.quickHitTitle}
+    <Card className="neon-border bg-card/80 backdrop-blur-lg overflow-hidden">
+      {/* Accent top bar */}
+      <div className="h-0.5 w-full bg-gradient-to-r from-primary via-secondary to-primary" />
+      
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-primary text-glow">
+            <Crosshair className="w-4 h-4 animate-pulse" />
+            <span className="tracking-[0.15em]">{settings.quickHitTitle}</span>
           </div>
-          <Badge variant="secondary" className="text-[10px] px-1.5">
+          <Badge className="text-[10px] px-2 bg-secondary/20 text-secondary border-secondary/30">
             {enabledApis.length}/{apis.length} APIs
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 px-3 pb-3">
+
+      <CardContent className="space-y-3 px-4 pb-4">
         {/* Access Key Input */}
-        <div className="space-y-1">
-          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Key className="w-3 h-3" />
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wider uppercase">
+            <Key className="w-3 h-3 text-secondary" />
             Access Key
           </Label>
           <Input
@@ -314,30 +299,30 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             value={userKey}
             onChange={(e) => setUserKey(e.target.value)}
             placeholder="Enter access key..."
-            className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
+            className="bg-input/80 border-primary/20 focus:border-primary focus:glow-primary text-base tracking-wider h-11 transition-all duration-300"
           />
         </div>
 
-        {/* Phone Input - Always Visible */}
-        <div className="space-y-1">
-          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Phone className="w-3 h-3" />
+        {/* Phone Input */}
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wider uppercase">
+            <Phone className="w-3 h-3 text-primary" />
             {settings.phoneLabel}
           </Label>
           <Input
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
             placeholder={settings.phonePlaceholder}
-            className="bg-input border-primary/30 focus:border-primary text-base tracking-wider h-10"
+            className="bg-input/80 border-secondary/20 focus:border-secondary focus:glow-secondary text-base tracking-wider h-11 transition-all duration-300"
             maxLength={15}
           />
         </div>
 
-        {/* Delay Control - Compact */}
-        <div className="flex items-center gap-3">
-          <Label className="text-muted-foreground flex items-center gap-1 text-xs shrink-0">
-            <Clock className="w-3 h-3" />
-            {delay}ms
+        {/* Delay Control */}
+        <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/20">
+          <Label className="text-muted-foreground flex items-center gap-1.5 text-xs shrink-0 tracking-wider">
+            <Clock className="w-3 h-3 text-primary" />
+            <span className="text-primary font-bold">{delay}ms</span>
           </Label>
           <Input
             type="range"
@@ -346,24 +331,24 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
             step="100"
             value={delay}
             onChange={(e) => setDelay(Number(e.target.value))}
-            className="cursor-pointer flex-1 h-2"
+            className="cursor-pointer flex-1 h-2 accent-primary"
           />
         </div>
 
-        {/* Stats - Compact Inline */}
+        {/* Stats */}
         {(hitCount > 0 || isRunning) && (
-          <div className="flex items-center justify-center gap-4 p-2 bg-muted/10 rounded-lg">
-            <div className="flex items-center gap-1 px-2 py-1 bg-primary/20 rounded">
-              <RotateCcw className="w-3 h-3 text-primary" />
-              <span className="text-sm font-bold text-primary">R{roundCount}</span>
+          <div className="flex items-center justify-center gap-3 p-2.5 rounded-lg neon-border bg-card/50">
+            <div className="flex items-center gap-1 px-2 py-1 rounded bg-secondary/15 border border-secondary/20">
+              <RotateCcw className="w-3 h-3 text-secondary" />
+              <span className="text-sm font-bold text-secondary">R{roundCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Activity className="w-3 h-3 text-secondary" />
-              <span className="text-sm font-bold text-secondary">{hitCount}</span>
+              <Activity className="w-3 h-3 text-primary" />
+              <span className="text-sm font-bold text-primary">{hitCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Wifi className="w-3 h-3 text-accent" />
-              <span className="text-sm font-bold text-accent">{successCount}</span>
+              <Wifi className="w-3 h-3 text-primary" />
+              <span className="text-sm font-bold text-primary">{successCount}</span>
             </div>
             <div className="flex items-center gap-1">
               <X className="w-3 h-3 text-destructive" />
@@ -374,29 +359,29 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
 
         {/* Current API indicator */}
         {currentApi && (
-          <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/30 animate-pulse">
-            <p className="text-xs text-primary text-center truncate">
-              🔥 <span className="font-bold">{currentApi}</span>
+          <div className="p-2 rounded-lg neon-border-pink bg-secondary/5 animate-pulse">
+            <p className="text-xs text-secondary text-center truncate font-bold tracking-wider">
+              ⚡ {currentApi}
             </p>
           </div>
         )}
 
         {/* No APIs Warning */}
         {apis.length === 0 && (
-          <div className="p-2 bg-warning/10 rounded-lg border border-warning/30 flex items-center gap-2">
+          <div className="p-2.5 bg-warning/5 rounded-lg border border-warning/20 flex items-center gap-2">
             <AlertCircle className="w-3 h-3 text-warning shrink-0" />
             <p className="text-xs text-warning">
-              <a href="/admin" className="underline font-bold">Admin</a> {settings.noApisWarning}
+              <a href="/admin" className="underline font-bold">[Admin]</a> {settings.noApisWarning}
             </p>
           </div>
         )}
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         {isRunning ? (
           <Button
             onClick={handleStop}
             variant="destructive"
-            className="w-full glow-destructive h-10"
+            className="w-full glow-destructive h-12 text-sm font-bold tracking-[0.2em] uppercase"
           >
             <X className="w-4 h-4 mr-2" />
             {settings.stopButtonText}
@@ -405,7 +390,7 @@ const QuickHitEngine: React.FC<QuickHitEngineProps> = ({ onLogCreate }) => {
           <Button
             onClick={handleQuickHit}
             disabled={!phone || phone.length < 10 || enabledApis.length === 0}
-            className="w-full bg-gradient-to-r from-primary via-secondary to-accent text-white font-bold h-10 glow-primary hover:opacity-90"
+            className="w-full h-12 text-sm font-bold tracking-[0.2em] uppercase bg-gradient-to-r from-primary to-secondary text-background hover:opacity-90 transition-all duration-300 glow-primary disabled:opacity-30"
           >
             <Zap className="w-4 h-4 mr-2" />
             {settings.hitButtonText} ({enabledApis.length})
