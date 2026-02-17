@@ -15,6 +15,10 @@ const AdminLogin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) {
+      toast.error('Loading config, please wait...');
+      return;
+    }
     setIsSubmitting(true);
 
     // Check against stored password from database
