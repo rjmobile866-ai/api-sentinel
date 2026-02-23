@@ -17,7 +17,7 @@ const HomePage = () => {
   
   // Password gate
   const [isAuthed, setIsAuthed] = useState(() => {
-    return sessionStorage.getItem('userPasswordAuth') === 'true';
+    return localStorage.getItem('userPasswordAuth') === 'true';
   });
   const [password, setPassword] = useState('');
   const [checking, setChecking] = useState(false);
@@ -37,8 +37,8 @@ const HomePage = () => {
         toast.error(data?.error || 'Invalid password');
         setPassword('');
       } else {
-        sessionStorage.setItem('userPasswordAuth', 'true');
-        sessionStorage.setItem('userPasswordId', data.password_id);
+        localStorage.setItem('userPasswordAuth', 'true');
+        localStorage.setItem('userPasswordId', data.password_id);
         setIsAuthed(true);
         toast.success('Access granted!');
       }
