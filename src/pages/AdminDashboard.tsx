@@ -10,13 +10,14 @@ import ApiExportImport from '@/components/dashboard/ApiExportImport';
 import LogsPanel from '@/components/dashboard/LogsPanel';
 import HitLogsPanel from '@/components/dashboard/HitLogsPanel';
 import SiteSettingsPanel from '@/components/dashboard/SiteSettingsPanel';
+import PasswordManager from '@/components/dashboard/PasswordManager';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { Plus, Database, Loader2, LogOut, Code, List, Settings } from 'lucide-react';
+import { Plus, Database, Loader2, LogOut, Code, List, Settings, KeyRound } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
@@ -150,32 +151,22 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-matrix pointer-events-none" />
       
-      {/* Custom Header - Mobile Optimized */}
-      <header className="border-b border-primary/30 bg-card/50 backdrop-blur sticky top-0 z-50">
-        <div className="container mx-auto px-3 py-2 flex items-center justify-between">
+      {/* Header */}
+      <header className="glass-strong sticky top-0 z-50">
+        <div className="container mx-auto px-3 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {settings.logoUrl ? (
-              <img 
-                src={settings.logoUrl} 
-                alt="Logo" 
-                className="w-8 h-8 rounded-lg object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 rounded-xl object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
-              <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/30 glow-primary">
+              <div className="p-1.5 rounded-xl bg-primary/10 border border-primary/15">
                 <Database className="w-5 h-5 text-primary" />
               </div>
             )}
             <h1 className="text-base sm:text-xl font-bold text-primary text-glow truncate">{settings.adminPanelTitle}</h1>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleLogout}
-            className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:glow-destructive text-xs px-2 py-1"
-          >
+          <Button variant="outline" size="sm" onClick={handleLogout}
+            className="border-destructive/20 text-destructive hover:bg-destructive/10 text-xs px-2 py-1 rounded-xl">
             <LogOut className="w-3 h-3 sm:mr-1" />
             <span className="hidden sm:inline">{settings.logoutButtonText}</span>
           </Button>
@@ -188,19 +179,23 @@ const AdminDashboard = () => {
         {/* Hit Engine */}
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />
 
-        {/* Tabs for API Management - Mobile Scrollable */}
+        {/* Tabs */}
         <Tabs defaultValue="apis" className="space-y-3 sm:space-y-4">
-          <TabsList className="bg-muted/30 border border-primary/30 w-full flex overflow-x-auto">
-            <TabsTrigger value="apis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
+          <TabsList className="glass rounded-xl w-full flex overflow-x-auto p-1">
+            <TabsTrigger value="apis" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary flex-1 text-xs sm:text-sm px-2 sm:px-3 rounded-lg">
               <List className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">APIs</span> ({apis.length})
             </TabsTrigger>
-            <TabsTrigger value="import" className="data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
-              <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Import</span>
-              <span className="sm:hidden">Import</span>
+            <TabsTrigger value="passwords" className="data-[state=active]:bg-accent/15 data-[state=active]:text-accent flex-1 text-xs sm:text-sm px-2 sm:px-3 rounded-lg">
+              <KeyRound className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Passwords</span>
+              <span className="sm:hidden">🔑</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3">
+            <TabsTrigger value="import" className="data-[state=active]:bg-secondary/15 data-[state=active]:text-secondary flex-1 text-xs sm:text-sm px-2 sm:px-3 rounded-lg">
+              <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              Import
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-muted data-[state=active]:text-foreground flex-1 text-xs sm:text-sm px-2 sm:px-3 rounded-lg">
               <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Settings</span>
               <span className="sm:hidden">⚙️</span>
@@ -277,6 +272,14 @@ const AdminDashboard = () => {
                 <LogsPanel logs={logs} onClear={clearLogs} />
                 <HitLogsPanel />
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Passwords Tab */}
+          <TabsContent value="passwords">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
+              <PasswordManager />
+              <HitLogsPanel />
             </div>
           </TabsContent>
 

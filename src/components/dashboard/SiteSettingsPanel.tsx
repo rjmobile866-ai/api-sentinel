@@ -45,35 +45,25 @@ const SiteSettingsPanel: React.FC = () => {
   };
 
   return (
-    <Card className="border-secondary/30 bg-card/50 backdrop-blur">
-      <CardHeader className="py-3 px-4">
-        <CardTitle className="flex items-center justify-between text-secondary text-glow text-base">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
+    <div className="glass-card rounded-2xl overflow-hidden">
+      <div className="h-0.5 w-full bg-gradient-to-r from-secondary via-accent to-primary" />
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-secondary font-bold text-sm tracking-wider">
+            <Settings className="w-4 h-4" />
             Site Settings
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              className="border-destructive/50 text-destructive hover:bg-destructive/10 text-xs"
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Reset
+            <Button variant="outline" size="sm" onClick={handleReset}
+              className="border-destructive/20 text-destructive hover:bg-destructive/10 text-xs rounded-xl">
+              <RotateCcw className="w-3 h-3 mr-1" /> Reset
             </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 text-xs"
-            >
-              <Save className="w-3 h-3 mr-1" />
-              Save
+            <Button size="sm" onClick={handleSave}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 text-xs rounded-xl">
+              <Save className="w-3 h-3 mr-1" /> Save
             </Button>
           </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-4 space-y-4">
+        </div>
         <Accordion type="multiple" defaultValue={['logo', 'header']} className="space-y-2">
           {/* Logo Section */}
           <AccordionItem value="logo" className="border border-primary/30 rounded-lg px-3">
@@ -297,29 +287,7 @@ const SiteSettingsPanel: React.FC = () => {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Access Key */}
-          <AccordionItem value="accesskey" className="border border-accent/30 rounded-lg px-3">
-            <AccordionTrigger className="py-2 text-sm">
-              <div className="flex items-center gap-2 text-accent">
-                <Key className="w-4 h-4" />
-                Access Key (User Key)
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pt-2 pb-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Access Key (Homepage pe user ko yeh key dena hoga)</Label>
-                <Input
-                  value={dbAccessKey}
-                  onChange={(e) => setDbAccessKey(e.target.value)}
-                  placeholder="Set access key (blank = no key required)"
-                  className="bg-input border-accent/30 text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  🔑 Blank rakhoge to bina key ke access milega. Key set karoge to user ko key dalna padega hit karne ke liye.
-                </p>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
+          {/* Removed Access Key section - now using Password Manager */}
 
           {/* Security / Password */}
           <AccordionItem value="security" className="border border-destructive/30 rounded-lg px-3">
@@ -379,8 +347,8 @@ const SiteSettingsPanel: React.FC = () => {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
