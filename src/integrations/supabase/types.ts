@@ -208,6 +208,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_passwords: {
+        Row: {
+          created_at: string
+          device_ip: string | null
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+          password: string
+        }
+        Insert: {
+          created_at?: string
+          device_ip?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          password: string
+        }
+        Update: {
+          created_at?: string
+          device_ip?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          password?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
