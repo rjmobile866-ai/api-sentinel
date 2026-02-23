@@ -32,7 +32,7 @@ const AdminDashboard = () => {
   const adminAuth = sessionStorage.getItem('adminAuth');
 
   if (!adminAuth) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/shubh" replace />;
   }
 
   const handleLogout = () => {

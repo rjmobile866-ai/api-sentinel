@@ -27,7 +27,7 @@ const AdminLogin = () => {
       // Store admin session in sessionStorage
       sessionStorage.setItem('adminAuth', 'true');
       toast.success('Access granted!');
-      navigate('/admin/dashboard');
+      navigate('/shubh/dashboard');
     } else {
       toast.error('Invalid password');
       setPassword('');
