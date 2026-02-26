@@ -9,12 +9,7 @@
 -- STEP 1: CLEANUP (Agar pehle se kuch hai toh)
 -- =============================================
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP TRIGGER IF EXISTS update_apis_updated_at ON public.apis;
-
-DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
-DROP FUNCTION IF EXISTS public.update_updated_at_column CASCADE;
-
+-- Pehle tables drop karo (triggers automatic delete ho jayenge)
 DROP TABLE IF EXISTS public.api_logs CASCADE;
 DROP TABLE IF EXISTS public.apis CASCADE;
 DROP TABLE IF EXISTS public.cors_proxies CASCADE;
@@ -22,6 +17,13 @@ DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.site_config CASCADE;
 DROP TABLE IF EXISTS public.user_passwords CASCADE;
 DROP TABLE IF EXISTS public.hit_logs CASCADE;
+
+-- Ab functions drop karo
+DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column CASCADE;
+
+-- Auth trigger separately (auth.users table always exists)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 -- =============================================
 -- STEP 2: CREATE TABLES
