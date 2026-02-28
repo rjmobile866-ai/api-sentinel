@@ -37,28 +37,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check if password is already locked to a different IP
-    if (pwRecord.device_ip && pwRecord.device_ip !== clientIp) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'This password is already in use on another device' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Lock password to this IP if not already locked
-    if (!pwRecord.device_ip) {
-      await supabase
-        .from('user_passwords')
-        .update({ device_ip: clientIp, last_used_at: new Date().toISOString() })
-        .eq('id', pwRecord.id)
-    } else {
-      await supabase
-        .from('user_passwords')
-        .update({ last_used_at: new Date().toISOString() })
-        .eq('id', pwRecord.id)
-    }
+    // Update last used info (no IP locking - mobile IPs change frequently)
+    await supabase
+      .from('user_passwords')
+      .update({ device_ip: clientIp, last_used_at: new Date().toISOString() })
+      .eq('id', pwRecord.id)
 
     return new Response(JSON.stringify({ 
       success: true, 
