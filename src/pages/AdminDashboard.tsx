@@ -191,7 +191,7 @@ const AdminDashboard = () => {
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />
 
         {/* Fast API Link */}
-        <div className="p-3 sm:p-4 glass rounded-xl border border-accent/30 space-y-2">
+        <div className="p-3 sm:p-4 glass rounded-xl border border-accent/30 space-y-3">
           <div className="flex items-center gap-2">
             <Link className="w-4 h-4 text-accent" />
             <h3 className="text-sm sm:text-base font-bold text-accent">⚡ Fast API Link</h3>
@@ -214,9 +214,63 @@ const AdminDashboard = () => {
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground font-mono break-all">
-            Example: {fastHitUrl}9876543210
-          </p>
+
+          {/* Parameters Table */}
+          <div className="bg-background/40 rounded-lg border border-border/50 overflow-hidden">
+            <table className="w-full text-[10px] sm:text-xs">
+              <thead>
+                <tr className="border-b border-border/50 bg-muted/30">
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Parameter</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Default</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Max</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium hidden sm:table-cell">Description</th>
+                </tr>
+              </thead>
+              <tbody className="text-foreground/80">
+                <tr className="border-b border-border/30">
+                  <td className="px-2 py-1.5 font-mono text-accent">phone</td>
+                  <td className="px-2 py-1.5 text-destructive">required</td>
+                  <td className="px-2 py-1.5">—</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">Phone number</td>
+                </tr>
+                <tr className="border-b border-border/30">
+                  <td className="px-2 py-1.5 font-mono text-accent">rounds</td>
+                  <td className="px-2 py-1.5">1</td>
+                  <td className="px-2 py-1.5">50</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">Kitne rounds chalane hain</td>
+                </tr>
+                <tr className="border-b border-border/30">
+                  <td className="px-2 py-1.5 font-mono text-accent">batch</td>
+                  <td className="px-2 py-1.5">5</td>
+                  <td className="px-2 py-1.5">20</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">Ek batch me kitni APIs</td>
+                </tr>
+                <tr className="border-b border-border/30">
+                  <td className="px-2 py-1.5 font-mono text-accent">delay</td>
+                  <td className="px-2 py-1.5">2</td>
+                  <td className="px-2 py-1.5">10</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">Rounds ke beech delay (sec)</td>
+                </tr>
+                <tr>
+                  <td className="px-2 py-1.5 font-mono text-accent">timeout</td>
+                  <td className="px-2 py-1.5">15</td>
+                  <td className="px-2 py-1.5">—</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">Per-API timeout (sec)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Full Example */}
+          <div className="bg-background/40 rounded-lg border border-border/50 p-2 sm:p-3 space-y-1.5">
+            <p className="text-[10px] sm:text-xs font-medium text-muted-foreground">📋 Full Example:</p>
+            <p className="text-[10px] sm:text-xs font-mono text-accent/90 break-all select-all">
+              {fastHitUrl}9876543210&rounds=5&batch=5&delay=2&timeout=15
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              ↑ 5 rounds, 5 APIs per batch, 2s delay between rounds, 15s timeout per API
+            </p>
+          </div>
         </div>
 
         {/* Tabs */}
