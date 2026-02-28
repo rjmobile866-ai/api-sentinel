@@ -17,9 +17,10 @@ import { useApis } from '@/hooks/useApis';
 import { useLogs } from '@/hooks/useLogs';
 import { useProxies } from '@/hooks/useProxies';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { Plus, Database, Loader2, LogOut, Code, List, Settings, KeyRound } from 'lucide-react';
+import { Plus, Database, Loader2, LogOut, Code, List, Settings, KeyRound, Link, Copy, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
 
 const AdminDashboard = () => {
   const { apis, loading: apisLoading, addApi, updateApi, deleteApi, toggleApiField, toggleAllApis, bulkImport } = useApis();
@@ -28,6 +29,16 @@ const AdminDashboard = () => {
   const { settings } = useSiteSettings();
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingApi, setEditingApi] = React.useState<any>(null);
+  const [copied, setCopied] = React.useState(false);
+
+  const fastHitUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fast-hit?phone=`;
+
+  const handleCopyFastLink = () => {
+    navigator.clipboard.writeText(fastHitUrl);
+    setCopied(true);
+    toast.success('Fast API link copied!');
+    setTimeout(() => setCopied(false), 2000);
+  };
   
   const adminAuth = sessionStorage.getItem('adminAuth');
 
@@ -178,6 +189,35 @@ const AdminDashboard = () => {
 
         {/* Hit Engine */}
         <HitEngine apis={apis} proxies={proxies} onLogCreate={addLog} />
+
+        {/* Fast API Link */}
+        <div className="p-3 sm:p-4 glass rounded-xl border border-accent/30 space-y-2">
+          <div className="flex items-center gap-2">
+            <Link className="w-4 h-4 text-accent" />
+            <h3 className="text-sm sm:text-base font-bold text-accent">⚡ Fast API Link</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Ek link se sari enabled APIs fire karo — bas phone number lagao end me.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input 
+              readOnly 
+              value={fastHitUrl + '9876543210'} 
+              className="text-xs bg-background/50 font-mono"
+            />
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={handleCopyFastLink}
+              className="border-accent/30 text-accent hover:bg-accent/10 shrink-0"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-mono break-all">
+            Example: {fastHitUrl}9876543210
+          </p>
+        </div>
 
         {/* Tabs */}
         <Tabs defaultValue="apis" className="space-y-3 sm:space-y-4">
