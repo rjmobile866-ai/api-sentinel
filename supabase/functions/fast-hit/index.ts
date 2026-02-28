@@ -35,6 +35,37 @@ function replaceInObject(obj: Record<string, unknown>, phone: string): Record<st
   return result;
 }
 
+// Per-API timeout wrapper - ensures one slow API doesn't block others
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Retry wrapper - retries once on failure
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  timeoutMs = 15000,
+  retries = 1
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetchWithTimeout(url, options, timeoutMs);
+    } catch (err) {
+      if (attempt === retries) throw err;
+      // Small delay before retry
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  throw new Error('All retries exhausted');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -43,6 +74,7 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const phone = url.searchParams.get('phone') || url.searchParams.get('number') || '';
+    const perApiTimeout = parseInt(url.searchParams.get('timeout') || '15') * 1000; // default 15s per API
 
     if (!phone) {
       return new Response(
@@ -51,7 +83,6 @@ serve(async (req) => {
       );
     }
 
-    // Get all enabled APIs from database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -75,18 +106,27 @@ serve(async (req) => {
       );
     }
 
-    // Log this hit
-    await supabase.from('hit_logs').insert({ phone });
+    // Log this hit (non-blocking)
+    supabase.from('hit_logs').insert({ phone }).then(() => {});
 
-    // Fire all APIs in parallel
+    // Fire all APIs in parallel with per-API timeout & retry
     const results = await Promise.allSettled(
       apis.map(async (api) => {
         const targetUrl = replacePlaceholders(api.url, phone);
         const headers: Record<string, string> = {
           'User-Agent': getRandomUA(),
           'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Cache-Control': 'no-cache',
           ...(api.headers ? replaceInObject(api.headers as Record<string, unknown>, phone) as Record<string, string> : {}),
         };
+
+        // Add origin/referer to look like real browser
+        try {
+          const parsed = new URL(targetUrl);
+          headers['Origin'] = parsed.origin;
+          headers['Referer'] = parsed.origin + '/';
+        } catch {}
 
         const method = (api.method || 'GET').toUpperCase();
         const fetchOptions: RequestInit = { method, headers };
@@ -105,7 +145,7 @@ serve(async (req) => {
         }
 
         const start = Date.now();
-        const response = await fetch(targetUrl, fetchOptions);
+        const response = await fetchWithRetry(targetUrl, fetchOptions, perApiTimeout, 1);
         const responseTime = Date.now() - start;
 
         return {
@@ -119,7 +159,10 @@ serve(async (req) => {
 
     const summary = results.map((r, i) => {
       if (r.status === 'fulfilled') return r.value;
-      return { name: apis[i].name, status: null, success: false, error: r.reason?.message };
+      const errMsg = r.reason?.name === 'AbortError' 
+        ? `Timeout (>${perApiTimeout/1000}s)` 
+        : (r.reason?.message || 'Unknown error');
+      return { name: apis[i].name, status: null, success: false, error: errMsg };
     });
 
     const successCount = summary.filter(s => s.success).length;
