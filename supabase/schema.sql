@@ -233,6 +233,8 @@ CREATE INDEX idx_cors_proxies_user_id ON public.cors_proxies(user_id);
 CREATE INDEX idx_cors_proxies_is_active ON public.cors_proxies(is_active);
 CREATE INDEX idx_user_passwords_is_active ON public.user_passwords(is_active);
 CREATE INDEX idx_hit_logs_phone ON public.hit_logs(phone);
+CREATE INDEX idx_hit_logs_created_at ON public.hit_logs(created_at DESC);
+CREATE INDEX idx_site_config_key ON public.site_config(key);
 
 -- =============================================
 -- STEP 14: SEED DATA - Default Admin Password
