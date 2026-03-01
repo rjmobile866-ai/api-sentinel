@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 CREATE TABLE IF NOT EXISTS public.apis (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id uuid NOT NULL,
+    user_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid,
     name text NOT NULL,
     url text NOT NULL,
     method text NOT NULL DEFAULT 'GET',
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.apis (
     proxy_enabled boolean DEFAULT false,
     force_proxy boolean DEFAULT true,
     rotation_enabled boolean DEFAULT false,
+    residential_proxy_enabled boolean DEFAULT false,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -56,6 +57,29 @@ CREATE TABLE IF NOT EXISTS public.cors_proxies (
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.hit_logs (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    phone text NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.site_config (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    key text NOT NULL,
+    value text NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_passwords (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    password text NOT NULL,
+    is_active boolean DEFAULT true,
+    device_ip text,
+    last_used_at timestamp with time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
 -- =============================================
 -- 2. ENABLE RLS
 -- =============================================
@@ -64,6 +88,9 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.apis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cors_proxies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_passwords ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
 -- 3. ALL RLS POLICIES
@@ -74,11 +101,11 @@ CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT U
 CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
 
--- APIs
-CREATE POLICY "Users can view their own APIs" ON public.apis FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own APIs" ON public.apis FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own APIs" ON public.apis FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own APIs" ON public.apis FOR DELETE USING (auth.uid() = user_id);
+-- APIs (Public Access)
+CREATE POLICY "Allow public read access to apis" ON public.apis FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to apis" ON public.apis FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to apis" ON public.apis FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to apis" ON public.apis FOR DELETE USING (true);
 
 -- API Logs
 CREATE POLICY "Users can view their own logs" ON public.api_logs FOR SELECT USING (auth.uid() = user_id);
@@ -90,6 +117,23 @@ CREATE POLICY "Users can view their own proxies" ON public.cors_proxies FOR SELE
 CREATE POLICY "Users can insert their own proxies" ON public.cors_proxies FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own proxies" ON public.cors_proxies FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own proxies" ON public.cors_proxies FOR DELETE USING (auth.uid() = user_id);
+
+-- Hit Logs (Public Access)
+CREATE POLICY "Allow public read hit_logs" ON public.hit_logs FOR SELECT USING (true);
+CREATE POLICY "Allow public insert to hit_logs" ON public.hit_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public delete hit_logs" ON public.hit_logs FOR DELETE USING (true);
+
+-- Site Config (Public Access)
+CREATE POLICY "Allow public read access to site_config" ON public.site_config FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to site_config" ON public.site_config FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to site_config" ON public.site_config FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to site_config" ON public.site_config FOR DELETE USING (true);
+
+-- User Passwords (Public Access)
+CREATE POLICY "Allow public read user_passwords" ON public.user_passwords FOR SELECT USING (true);
+CREATE POLICY "Allow public insert user_passwords" ON public.user_passwords FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update user_passwords" ON public.user_passwords FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete user_passwords" ON public.user_passwords FOR DELETE USING (true);
 
 -- =============================================
 -- 4. FUNCTIONS & TRIGGERS
@@ -131,7 +175,13 @@ CREATE INDEX IF NOT EXISTS idx_apis_user_id ON public.apis(user_id);
 CREATE INDEX IF NOT EXISTS idx_apis_enabled ON public.apis(enabled);
 CREATE INDEX IF NOT EXISTS idx_api_logs_user_id ON public.api_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON public.api_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_logs_api_id ON public.api_logs(api_id);
 CREATE INDEX IF NOT EXISTS idx_cors_proxies_user_id ON public.cors_proxies(user_id);
+CREATE INDEX IF NOT EXISTS idx_cors_proxies_is_active ON public.cors_proxies(is_active);
+CREATE INDEX IF NOT EXISTS idx_hit_logs_phone ON public.hit_logs(phone);
+CREATE INDEX IF NOT EXISTS idx_hit_logs_created_at ON public.hit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_site_config_key ON public.site_config(key);
+CREATE INDEX IF NOT EXISTS idx_user_passwords_is_active ON public.user_passwords(is_active);
 
 -- =============================================
 -- DONE! ✅
